@@ -58,8 +58,12 @@ export function SkipModalMedium({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh]">
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      // 모달이 닫히는 경우(외부 클릭) 무시 - 오직 "내일 다시" 버튼으로만 닫힘
+      if (!isOpen) return
+      onClose()
+    }}>
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] [&>button[class*='absolute']]:hidden">
         <DialogHeader>
           <DialogTitle className="text-4xl font-bold">
             {word.word_text}

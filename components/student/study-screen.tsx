@@ -274,9 +274,6 @@ export function StudyScreen({ token }: { token: string }) {
       {/* 현재 단어 */}
       <section className="h-1/3 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center space-y-2">
-          <div className="text-sm text-muted-foreground">
-            {currentWord.sequence_order}번째 단어
-          </div>
           <h1 className="text-6xl md:text-7xl font-bold tracking-tight animate-in fade-in zoom-in duration-300">
             {currentWord.word_text}
           </h1>
