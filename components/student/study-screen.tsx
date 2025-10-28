@@ -26,6 +26,7 @@ export function StudyScreen({ token }: { token: string }) {
     handleKnow,
     handleDontKnow,
     confirmSkip,
+    fetchNextWord,
   } = useStudySession(token)
 
   const [skipModalOpen, setSkipModalOpen] = useState(false)
@@ -38,8 +39,19 @@ export function StudyScreen({ token }: { token: string }) {
   const [generationModalOpen, setGenerationModalOpen] = useState(false)
   const [generationModalData, setGenerationModalData] = useState<any>(null)
 
+  // 중복 클릭 방지
+  const [isProcessing, setIsProcessing] = useState(false)
+
   const onKnowClick = async () => {
+    // 중복 클릭 방지
+    if (isProcessing) {
+      console.log('⚠️ 처리 중입니다. 잠시만 기다려주세요.')
+      return
+    }
+
     try {
+      setIsProcessing(true)  // 처리 시작
+      
       const result = await handleKnow()
       if (result?.goalAchieved) {
         // 완성 단어장 데이터 저장
@@ -64,11 +76,15 @@ export function StudyScreen({ token }: { token: string }) {
     } catch (err) {
       console.error('단어 완료 처리 오류:', err)
       alert('오류가 발생했습니다')
+    } finally {
+      setIsProcessing(false)  // 처리 완료
     }
   }
 
   const handleGoalModalClose = () => {
     setGoalModalOpen(false)
+    // Day 완료 후 진행률 새로고침 + 다음 Day의 첫 단어 로드
+    fetchNextWord(true)  // ⭐ forceRefresh=true로 progress 먼저 갱신
   }
 
   const onDontKnowClick = async () => {
@@ -282,9 +298,10 @@ export function StudyScreen({ token }: { token: string }) {
           <Button 
             size="lg" 
             onClick={onKnowClick}
+            disabled={isProcessing}
             className="min-w-[120px] text-lg h-14"
           >
-            안다
+            {isProcessing ? '처리 중...' : '안다'}
           </Button>
           <Button 
             size="lg" 

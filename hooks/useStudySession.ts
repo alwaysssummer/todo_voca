@@ -179,8 +179,13 @@ export function useStudySession(token: string) {
   }
 
   // 다음 단어 가져오기
-  const fetchNextWord = async () => {
+  const fetchNextWord = async (forceRefresh = false) => {
     if (!student || !currentAssignment) return
+
+    // ⭐ forceRefresh: Day 완료 후 진행률을 먼저 새로고침
+    if (forceRefresh && currentWordlist) {
+      await updateProgress(student.id, currentAssignment, currentWordlist)
+    }
 
     // ⭐ 핵심 안정성 개선: Day별 학습 제어
     // 오늘의 목표를 달성했으면 더 이상 단어를 제공하지 않음
@@ -217,35 +222,43 @@ export function useStudySession(token: string) {
     try {
       const today = new Date().toISOString().split('T')[0]
 
-      let query = supabase
-        .from('student_word_progress')
-        .select(`
-          word_id,
-          words:word_id (
-            id,
-            word_text,
-            meaning,
-            wordlist_id
-          )
-        `)
+      // 1. 오늘 생성된 완성 단어장들의 단어만 표시
+      const { data: todayCompletedWordlists } = await supabase
+        .from('completed_wordlists')
+        .select('word_ids')
         .eq('student_id', student.id)
-        .eq('status', 'completed')
+        .eq('assignment_id', currentAssignment.id)
         .eq('completed_date', today)
-        .order('updated_at', { ascending: false })
+        .order('day_number', { ascending: true })
 
-      if (currentAssignment.filtered_word_ids && currentAssignment.filtered_word_ids.length > 0) {
-        query = query.in('word_id', currentAssignment.filtered_word_ids)
+      if (!todayCompletedWordlists || todayCompletedWordlists.length === 0) {
+        setCompletedWords([])
+        return
       }
 
-      const { data, error } = await query
+      // 2. 모든 완성 단어장의 단어 ID 수집
+      const allWordIds = todayCompletedWordlists.flatMap(wl => wl.word_ids)
+
+      if (allWordIds.length === 0) {
+        setCompletedWords([])
+        return
+      }
+
+      // 3. 단어 정보 조회
+      const { data: wordsData, error } = await supabase
+        .from('words')
+        .select('id, word_text, meaning, wordlist_id')
+        .in('id', allWordIds)
 
       if (error) throw error
 
-      const words = data
-        ?.map(item => (item as any).words)
-        .filter(Boolean) || []
+      // 4. word_ids 순서대로 정렬 (완료 순서 유지)
+      const orderedWords = allWordIds
+        .map(id => wordsData?.find(w => w.id === id))
+        .filter(Boolean)
+        .reverse()  // 최근 완료한 단어가 위로
 
-      setCompletedWords(words)
+      setCompletedWords(orderedWords as Word[])
     } catch (err) {
       console.error('완료 단어 목록 로드 실패:', err)
     }
@@ -346,21 +359,55 @@ export function useStudySession(token: string) {
   }
 
   // 완성 단어장 생성
-  const createCompletedWordlist = async () => {
+  const createCompletedWordlist = async (completedCount?: number) => {
     if (!student || !currentAssignment) return null
 
     try {
       const today = new Date().toISOString().split('T')[0]
 
-      // 1. 오늘 완료한 단어 ID 목록 가져오기
+      // 1. Day 번호 먼저 계산 (정확한 값 사용)
+      const actualCompleted = completedCount !== undefined ? completedCount : progress.generationCompleted
+      const dayNumber = Math.ceil(actualCompleted / currentAssignment.daily_goal)
+
+      // 2. 이미 생성된 완성 단어장 확인 (중복 방지 - Race Condition 대응)
+      const { data: existingCheck } = await supabase
+        .from('completed_wordlists')
+        .select('id, word_ids')
+        .eq('assignment_id', currentAssignment.id)
+        .eq('day_number', dayNumber)
+        .eq('completed_date', today)
+        .maybeSingle()
+
+      if (existingCheck) {
+        console.log(`⚠️ Day ${dayNumber} 완성 단어장이 이미 존재합니다. 기존 것을 사용합니다.`)
+        return {
+          completedWordlistId: existingCheck.id,
+          dayNumber,
+          wordCount: existingCheck.word_ids.length,
+          generation: currentAssignment.generation
+        }
+      }
+
+      // 3. 오늘 이미 생성된 다른 Day 완성 단어장들의 단어 ID 수집
+      const { data: existingWordlists } = await supabase
+        .from('completed_wordlists')
+        .select('word_ids')
+        .eq('student_id', student.id)
+        .eq('assignment_id', currentAssignment.id)
+        .eq('completed_date', today)
+
+      const existingWordIds = new Set(
+        existingWordlists?.flatMap(wl => wl.word_ids) || []
+      )
+
+      // 4. 오늘 완료한 단어 중 아직 완성 단어장에 포함되지 않은 단어만
       let progressQuery = supabase
         .from('student_word_progress')
-        .select('word_id')
+        .select('word_id, updated_at')
         .eq('student_id', student.id)
         .eq('status', 'completed')
         .eq('completed_date', today)
         .order('updated_at', { ascending: true })
-        .limit(currentAssignment.daily_goal)
 
       if (currentAssignment.filtered_word_ids && currentAssignment.filtered_word_ids.length > 0) {
         progressQuery = progressQuery.in('word_id', currentAssignment.filtered_word_ids)
@@ -370,16 +417,29 @@ export function useStudySession(token: string) {
 
       if (progressError) throw progressError
 
-      const wordIds = progressData?.map(p => p.word_id) || []
+      // 5. 이미 포함된 단어 제외하고 daily_goal 개수만큼
+      const wordIds = (progressData?.map(p => p.word_id) || [])
+        .filter(id => !existingWordIds.has(id))
+        .slice(0, currentAssignment.daily_goal)
 
       if (wordIds.length === 0) {
-        throw new Error('완료한 단어가 없습니다')
+        console.warn('⚠️ 완료한 단어가 없습니다 (이미 모두 완성 단어장에 포함됨)')
+        return null
       }
 
-      // 2. Day 번호 계산 (세대 진행률 기반)
-      const dayNumber = Math.ceil(progress.generationCompleted / currentAssignment.daily_goal)
+      // ⭐ 최소 단어 수 검증 (daily_goal 개수 미만이면 생성 안 함)
+      if (wordIds.length < currentAssignment.daily_goal) {
+        console.error(`❌ Day ${dayNumber} 완성 단어장 생성 실패: 단어 수 부족`)
+        console.error(`   필요: ${currentAssignment.daily_goal}개`)
+        console.error(`   실제: ${wordIds.length}개`)
+        console.error(`   누락: ${currentAssignment.daily_goal - wordIds.length}개`)
+        console.warn('⚠️ 원인: Skip된 단어가 있을 가능성이 높습니다')
+        console.warn('⚠️ 해결: Skip된 단어를 모두 학습한 후 다시 시도하세요')
+        console.warn(`⚠️ 현재 ${wordIds.length}개만 완료되어 Day ${dayNumber} 생성이 보류되었습니다`)
+        return null
+      }
 
-      // 3. 완성 단어장 생성
+      // 6. 완성 단어장 생성 (UNIQUE 제약으로 중복 방지)
       const { data: completedWordlist, error: insertError } = await supabase
         .from('completed_wordlists')
         .insert({
@@ -395,9 +455,34 @@ export function useStudySession(token: string) {
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        // 7. UNIQUE 제약 위반 시 처리 (Race Condition)
+        if (insertError.code === '23505') {
+          console.warn(`⚠️ Day ${dayNumber} 완성 단어장이 이미 존재합니다 (Race condition). 기존 것을 조회합니다.`)
+          const { data: existing } = await supabase
+            .from('completed_wordlists')
+            .select('id, word_ids')
+            .eq('assignment_id', currentAssignment.id)
+            .eq('day_number', dayNumber)
+            .eq('completed_date', today)
+            .single()
+          
+          if (existing) {
+            return {
+              completedWordlistId: existing.id,
+              dayNumber,
+              wordCount: existing.word_ids.length,
+              generation: currentAssignment.generation
+            }
+          }
+        }
+        throw insertError
+      }
 
-      console.log(`✅ Day ${dayNumber} (${currentAssignment.generation}차) 완성 단어장 생성 완료`)
+      console.log(`✅ Day ${dayNumber} (${currentAssignment.generation}차) 완성 단어장 생성 완료`, {
+        wordIds,
+        count: wordIds.length
+      })
 
       return { 
         completedWordlistId: completedWordlist.id, 
@@ -436,20 +521,33 @@ export function useStudySession(token: string) {
       // 완료 목록에 추가
       setCompletedWords([currentWord, ...completedWords])
       
-      // 진행률 업데이트
-      const newToday = progress.today + 1
+      // 진행률 업데이트 - 정확한 계산
       const newGenerationCompleted = progress.generationCompleted + 1
+      const newTodayProgress = newGenerationCompleted % currentAssignment.daily_goal
+      const newDay = newGenerationCompleted === 0 
+        ? 1 
+        : Math.ceil(newGenerationCompleted / currentAssignment.daily_goal)
       
       setProgress(prev => ({ 
         ...prev, 
-        today: newToday,
-        generationCompleted: newGenerationCompleted
+        today: newTodayProgress,
+        generationCompleted: newGenerationCompleted,
+        day: newDay
       }))
 
       // A. 일일 목표 달성 체크 (배수 체크)
       if (newGenerationCompleted % currentAssignment.daily_goal === 0) {
-        // 완성 단어장 생성
-        const completedData = await createCompletedWordlist()
+        // 완성 단어장 생성 (정확한 completed 값 전달)
+        const completedData = await createCompletedWordlist(newGenerationCompleted)
+        
+        // completedData가 null이면 에러 처리 (Skip된 단어로 인한 부족)
+        if (!completedData) {
+          console.error('❌ 완성 단어장 생성 실패 - Skip된 단어가 있을 가능성')
+          console.warn('⚠️ Day 완료 처리를 건너뛰고 다음 단어를 계속 학습합니다')
+          // Day 완료 처리 안 하고 다음 단어 로드
+          await fetchNextWord()
+          return { goalAchieved: false }
+        }
         
         // B. 세대 완료 체크
         const isGenerationComplete = await checkGenerationComplete()
@@ -480,7 +578,7 @@ export function useStudySession(token: string) {
           }
         }
         
-        // 일일 목표만 달성
+        // 일일 목표만 달성 - 모달 닫은 후 fetchNextWord 호출됨
         return { 
           goalAchieved: true,
           completedWordlistData: completedData,
