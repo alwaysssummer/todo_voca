@@ -20,6 +20,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
 import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialog'
+import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
+import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { Input } from '@/components/ui/input'
 
 interface DashboardStats {
@@ -62,8 +64,11 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true)
   const [addStudentOpen, setAddStudentOpen] = useState(false)
   const [assignWordlistOpen, setAssignWordlistOpen] = useState(false)
+  const [addWordlistOpen, setAddWordlistOpen] = useState(false)
+  const [viewWordlistOpen, setViewWordlistOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState('')
   const [selectedStudentName, setSelectedStudentName] = useState('')
+  const [selectedWordlist, setSelectedWordlist] = useState<Wordlist | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -581,7 +586,11 @@ export default function TeacherDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>단어장 목록</CardTitle>
-              <Button size="sm" className="gap-2">
+              <Button 
+                size="sm" 
+                className="gap-2"
+                onClick={() => setAddWordlistOpen(true)}
+              >
                 <Plus className="w-4 h-4" />
                 단어장 추가
               </Button>
@@ -614,7 +623,15 @@ export default function TeacherDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="gap-2"
+                        onClick={() => {
+                          setSelectedWordlist(wordlist)
+                          setViewWordlistOpen(true)
+                        }}
+                      >
                         <Eye className="w-3 h-3" />
                         보기
                       </Button>
@@ -659,6 +676,28 @@ export default function TeacherDashboard() {
         studentName={selectedStudentName}
         onSuccess={loadDashboardData}
       />
+
+      {/* 단어장 추가 다이얼로그 */}
+      <AddWordlistDialog
+        open={addWordlistOpen}
+        onClose={() => setAddWordlistOpen(false)}
+        onSuccess={loadDashboardData}
+      />
+
+      {/* 단어장 보기 다이얼로그 */}
+      {selectedWordlist && (
+        <ViewWordlistDialog
+          open={viewWordlistOpen}
+          onClose={() => {
+            setViewWordlistOpen(false)
+            setSelectedWordlist(null)
+          }}
+          wordlistId={selectedWordlist.id}
+          wordlistTitle={selectedWordlist.title}
+          totalWords={selectedWordlist.totalWords}
+          assignedStudents={selectedWordlist.assignedStudents}
+        />
+      )}
     </div>
   )
 }

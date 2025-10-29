@@ -430,7 +430,7 @@ export function StudyScreen({ token }: { token: string }) {
           onClose={handleGoalModalClose}
           completedCount={progress.today}
           goal={progress.todayGoal}
-          dayNumber={completedWordlistData?.dayNumber || progress.day}
+          dayNumber={completedWordlistData?.sessionNumber || progress.session}
           completedWordlistId={completedWordlistData?.completedWordlistId || ''}
           studentToken={token}
         />
