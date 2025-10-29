@@ -11,6 +11,7 @@ import { SkipModalMedium } from './skip-modal-medium'
 import { GoalAchievedModal } from './goal-achieved-modal'
 import { GenerationCompleteModal } from './generation-complete-modal'
 import { Loader2 } from 'lucide-react'
+import type { Word } from '@/types/word'
 
 export function StudyScreen({ token }: { token: string }) {
   const {

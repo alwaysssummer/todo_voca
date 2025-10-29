@@ -161,7 +161,14 @@ export default function StudentDetailPage() {
         .order('created_at', { ascending: false })
         .limit(5)
 
-      setRecentTests(testsDataRecent || [])
+      const formattedTests = (testsDataRecent || []).map(test => ({
+        id: test.id,
+        score: test.score,
+        grade: test.grade,
+        createdAt: test.created_at,
+        wordlistId: test.completed_wordlist_id
+      }))
+      setRecentTests(formattedTests)
 
       setLoading(false)
     } catch (err) {

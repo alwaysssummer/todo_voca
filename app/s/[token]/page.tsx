@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation'
 import { StudyScreen } from '@/components/student/study-screen'
 
 interface StudentPageProps {
-  params: {
+  params: Promise<{
     token: string
-  }
+  }>
 }
 
 export default async function StudentPage({ params }: StudentPageProps) {
