@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -86,6 +86,13 @@ export function StudyScreen({ token }: { token: string }) {
     // Day 완료 후 진행률 새로고침 + 다음 Day의 첫 단어 로드
     fetchNextWord(true)  // ⭐ forceRefresh=true로 progress 먼저 갱신
   }
+
+  // ⭐ 페이지 로드 시 단어가 없으면 fetchNextWord 호출
+  useEffect(() => {
+    if (!loading && !error && !currentWord && student && currentAssignment) {
+      fetchNextWord(true)
+    }
+  }, [loading, error, currentWord, student, currentAssignment])
 
   const onDontKnowClick = async () => {
     try {

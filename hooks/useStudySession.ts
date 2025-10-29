@@ -144,9 +144,18 @@ export function useStudySession(token: string) {
 
     // C. 현재 Day 및 Day 내 진행률 계산
     const completed = generationCompletedCount || 0
-    // ⭐ Day 계산 통일: Math.ceil 사용 (0개일 때는 Day 1)
-    const currentDay = completed === 0 ? 1 : Math.ceil(completed / assignment.daily_goal)
     const todayProgress = completed % assignment.daily_goal
+    
+    // ⭐ Day 계산 수정: 배수 완료 시 다음 Day로
+    // todayProgress === 0이면 이전 Day 완료 → 다음 Day 시작
+    let currentDay: number
+    if (completed === 0) {
+      currentDay = 1  // 첫 시작
+    } else if (todayProgress === 0) {
+      currentDay = (completed / assignment.daily_goal) + 1  // 배수 완료 → 다음 Day
+    } else {
+      currentDay = Math.ceil(completed / assignment.daily_goal)  // 진행 중
+    }
 
     setProgress({
       today: todayProgress,  // 현재 Day 내 진행률 (0~49)
@@ -524,9 +533,16 @@ export function useStudySession(token: string) {
       // 진행률 업데이트 - 정확한 계산
       const newGenerationCompleted = progress.generationCompleted + 1
       const newTodayProgress = newGenerationCompleted % currentAssignment.daily_goal
-      const newDay = newGenerationCompleted === 0 
-        ? 1 
-        : Math.ceil(newGenerationCompleted / currentAssignment.daily_goal)
+      
+      // ⭐ Day 계산 수정: updateProgress와 동일한 로직
+      let newDay: number
+      if (newGenerationCompleted === 0) {
+        newDay = 1
+      } else if (newTodayProgress === 0) {
+        newDay = (newGenerationCompleted / currentAssignment.daily_goal) + 1
+      } else {
+        newDay = Math.ceil(newGenerationCompleted / currentAssignment.daily_goal)
+      }
       
       setProgress(prev => ({ 
         ...prev, 
