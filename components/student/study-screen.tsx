@@ -90,8 +90,10 @@ export function StudyScreen({ token }: { token: string }) {
   // ⭐ 페이지 로드 시 단어가 없으면 fetchNextWord 호출
   useEffect(() => {
     if (!loading && !error && !currentWord && student && currentAssignment) {
+      console.log('🔄 useEffect: 단어 없음, fetchNextWord 호출')
       fetchNextWord(true)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, error, currentWord, student, currentAssignment])
 
   const onDontKnowClick = async () => {

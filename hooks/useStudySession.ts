@@ -157,13 +157,15 @@ export function useStudySession(token: string) {
       currentDay = Math.ceil(completed / assignment.daily_goal)  // 진행 중
     }
 
-    setProgress({
+    const newProgress = {
       today: todayProgress,  // 현재 Day 내 진행률 (0~49)
       todayGoal: assignment.daily_goal,
       generationCompleted: completed,
       generationTotal: generationTotal,
       day: currentDay
-    })
+    }
+
+    setProgress(newProgress)
 
     // D. 평가 대기 체크
     const { data: pendingTestData } = await supabase
@@ -185,6 +187,9 @@ export function useStudySession(token: string) {
         pendingTestId: null
       })
     }
+
+    // ⭐ 계산된 진행률 반환 (forceRefresh 시 사용)
+    return newProgress
   }
 
   // 다음 단어 가져오기
@@ -193,19 +198,12 @@ export function useStudySession(token: string) {
 
     // ⭐ forceRefresh: Day 완료 후 진행률을 먼저 새로고침
     if (forceRefresh && currentWordlist) {
-      await updateProgress(student.id, currentAssignment, currentWordlist)
-    }
-
-    // ⭐ 핵심 안정성 개선: Day별 학습 제어
-    // 오늘의 목표를 달성했으면 더 이상 단어를 제공하지 않음
-    if (progress.today >= progress.todayGoal) {
-      console.log(`Day ${progress.day} 완료: ${progress.today}/${progress.todayGoal}`)
-      setCurrentWord(null)
-      return
+      const refreshedProgress = await updateProgress(student.id, currentAssignment, currentWordlist)
+      console.log('📊 진행률 새로고침:', refreshedProgress)
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .rpc('get_next_word', {
           p_student_id: student.id,
           p_assignment_id: currentAssignment.id
@@ -214,12 +212,14 @@ export function useStudySession(token: string) {
       if (error) throw error
       
       if (data && data.length > 0) {
+        console.log('✅ 다음 단어 로드:', data[0].word_text)
         setCurrentWord(data[0])
       } else {
+        console.log('ℹ️ 더 이상 학습할 단어가 없습니다')
         setCurrentWord(null)
       }
     } catch (err) {
-      console.error('다음 단어 로드 실패:', err)
+      console.error('❌ 다음 단어 로드 실패:', err)
       setCurrentWord(null)
     }
   }
