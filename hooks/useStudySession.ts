@@ -860,6 +860,9 @@ export function useStudySession(token: string) {
         // 마지막 회차 완성 단어장 생성
         const completedData = await createCompletedWordlist(newCompleted)
         
+        // ⭐⭐⭐ 중요: 세대 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
+        setCurrentWord(null)
+        
         if (skippedWords.length > 0) {
           // ⭐ 중복 방지: 이미 생성 중이면 skip
           if (isGeneratingReview) {
@@ -954,10 +957,10 @@ export function useStudySession(token: string) {
       // skip_count 증가
       const { data: existingProgress } = await supabase
         .from('student_word_progress')
-        .select('skip_count')
+        .select('*')  // ⭐ skip_count 대신 * 사용 (406 에러 방지)
         .eq('student_id', student.id)
         .eq('word_id', currentWord.id)
-        .single()
+        .maybeSingle()  // ⭐ single() → maybeSingle() (데이터 없을 수 있음)
 
       const currentSkipCount = existingProgress?.skip_count || 0
       const newSkipCount = currentSkipCount + 1
