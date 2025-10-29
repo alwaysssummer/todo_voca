@@ -193,8 +193,19 @@ export function useStudySession(token: string) {
 
   // 초기 로딩 완료 후 첫 단어 가져오기
   useEffect(() => {
+    console.log('🟡 [useEffect] 트리거됨:', {
+      loading,
+      hasStudent: !!student,
+      hasCurrentAssignment: !!currentAssignment,
+      currentWord: currentWord?.word_text || 'null',
+      error,
+      isGeneratingReview
+    })
     if (!loading && student && currentAssignment && !currentWord && !error && !isGeneratingReview) {
+      console.log('🟡 [useEffect] 조건 충족! fetchNextWord() 호출')
       fetchNextWord()
+    } else {
+      console.log('🟡 [useEffect] 조건 불충족, fetchNextWord() 호출 안 함')
     }
   }, [loading, student, currentAssignment, isGeneratingReview])  // ⭐ isGeneratingReview 의존성 추가
 
@@ -268,7 +279,11 @@ export function useStudySession(token: string) {
 
   // 다음 단어 가져오기
   const fetchNextWord = async (forceRefresh = false) => {
-    if (!student || !currentAssignment) return
+    console.log('🔵 [fetchNextWord] 호출됨 - forceRefresh:', forceRefresh)
+    if (!student || !currentAssignment) {
+      console.log('🔵 [fetchNextWord] student 또는 currentAssignment 없음. 종료.')
+      return
+    }
 
     // ⭐ forceRefresh: 회차 완료 후 진행률을 먼저 새로고침
     if (forceRefresh && currentWordlist) {
@@ -282,7 +297,8 @@ export function useStudySession(token: string) {
       console.log('🔍 get_next_word 호출:', {
         student_id: student.id,
         assignment_id: currentAssignment.id,
-        current_session: currentSession  // ⭐ 회차 전달
+        current_session: currentSession,  // ⭐ 회차 전달
+        currentWord: currentWord?.word_text || 'null'
       })
 
       const { data, error} = await supabase
@@ -299,19 +315,24 @@ export function useStudySession(token: string) {
       
       if (data && data.length > 0) {
         console.log('✅ 다음 단어 로드:', data[0].word_text, '(sequence:', data[0].sequence_order + ')')
+        console.log('🔵 [fetchNextWord] setCurrentWord 호출 - 단어:', data[0].word_text)
         setCurrentWord(data[0])
       } else {
         console.log('ℹ️ 더 이상 학습할 단어가 없습니다')
+        console.log('🔵 [fetchNextWord] setCurrentWord(null) 호출')
         setCurrentWord(null)
         
         // ⭐ 단어가 없을 때 세대 완료 체크
         if (currentWordlist) {
+          console.log('🔵 [fetchNextWord] 세대 완료 체크 시작...')
           const isComplete = await checkGenerationComplete()
+          console.log('🔵 [fetchNextWord] 세대 완료 체크 결과:', isComplete)
           if (isComplete) {
             console.log('🎉 세대 완료 감지!')
             
             // ⭐⭐⭐ 복습 단어장 생성 로직 실행
             const skippedWords = await getSkippedWordsInGeneration()
+            console.log('🔵 [fetchNextWord] Skip된 단어 개수:', skippedWords.length)
             
             if (skippedWords.length > 0 && !isGeneratingReview && !isGeneratingReviewRef.current) {
               // ⭐ useRef로 즉시 중복 방지
@@ -851,16 +872,21 @@ export function useStudySession(token: string) {
       setProgress(newProgress)
 
       // ⭐⭐⭐ A. 세대 완료 체크 (최우선 - 100번째 단어 무한로딩 방지!)
+      console.log('🟢 [handleKnow] 세대 완료 체크 시작... newCompleted:', newCompleted)
       const isGenerationComplete = await checkGenerationComplete()
+      console.log('🟢 [handleKnow] 세대 완료 체크 결과:', isGenerationComplete)
       
       if (isGenerationComplete) {
         console.log('🎉 세대 완료!')
         const skippedWords = await getSkippedWordsInGeneration()
+        console.log('🟢 [handleKnow] Skip된 단어 개수:', skippedWords.length)
         
         // 마지막 회차 완성 단어장 생성
         const completedData = await createCompletedWordlist(newCompleted)
+        console.log('🟢 [handleKnow] 완성 단어장 생성 완료:', completedData)
         
         // ⭐⭐⭐ 중요: 세대 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
+        console.log('🟢 [handleKnow] setCurrentWord(null) 호출 - 무한 루프 방지!')
         setCurrentWord(null)
         
         if (skippedWords.length > 0) {
