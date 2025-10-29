@@ -1,12 +1,21 @@
 'use client'
 
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
-import { Card } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Target, Trophy, Calendar, CheckCircle2, Clock } from 'lucide-react'
+import { 
+  BookOpen, 
+  Loader2, 
+  AlertCircle, 
+  BarChart3,
+  CheckCircle2,
+  XCircle,
+  Calendar,
+  Play,
+  Award
+} from 'lucide-react'
 
 interface StudentDashboardProps {
   token: string
@@ -20,7 +29,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-muted-foreground">로딩 중...</p>
         </div>
       </div>
@@ -29,203 +38,242 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <Card className="p-6 max-w-md">
-          <p className="text-red-600">오류가 발생했습니다: {error?.message}</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-destructive">오류 발생</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {error?.message || '알 수 없는 오류가 발생했습니다'}
+            </p>
+          </CardContent>
         </Card>
       </div>
     )
   }
 
-  const { student, currentAssignment, completedDays } = data
-  const progressPercentage = (currentAssignment.completed_words / currentAssignment.total_words) * 100
-  // ⭐ Day 계산 통일: Math.ceil 사용
-  const currentDay = currentAssignment.completed_words === 0 ? 1 : Math.ceil(currentAssignment.completed_words / student.daily_goal)
-  const todayProgress = currentAssignment.completed_words % student.daily_goal
-  // ⭐ 전체 세대 완료 여부 체크 (모든 단어를 학습했을 때만 버튼 비활성화)
+  const { student, currentAssignment, completedSessions } = data
+  
+  // ⭐ 통계 계산
+  const currentSession = currentAssignment.completed_words === 0 ? 1 : Math.ceil(currentAssignment.completed_words / student.session_goal)
+  const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
+  const todayProgress = currentAssignment.completed_words % student.session_goal
+  const completedSessionsCount = completedSessions.length
+  
+  // O-TEST, X-TEST 완료 통계 (향후 구현)
+  const oTestCompleted = 0  // TODO: online_tests 테이블에서 조회
+  const xTestCompleted = 0  // TODO: online_tests 테이블에서 조회
+  
   const isGenerationCompleted = currentAssignment.completed_words >= currentAssignment.total_words
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* 헤더 */}
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">{student.name}</h1>
-                <p className="text-sm text-muted-foreground">{currentAssignment.wordlist_name}</p>
-              </div>
-              <Badge variant="secondary" className="text-lg px-4 py-2">
-                {currentAssignment.generation}차
-              </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* 헤더 */}
+      <header className="bg-white border-b shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
+              <BookOpen className="w-6 h-6 text-white" />
             </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">전체 진행률</span>
-                <span className="font-semibold">
-                  {currentAssignment.completed_words}/{currentAssignment.total_words} 
-                  ({progressPercentage.toFixed(0)}%)
-                </span>
-              </div>
-              <Progress value={progressPercentage} className="h-3" />
-            </div>
-
-            <div className="flex items-center justify-between text-sm bg-muted/50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-blue-600" />
-                <span className="font-medium">현재 Day {currentDay}</span>
-              </div>
-              <span className="text-muted-foreground">
-                {todayProgress}/{student.daily_goal} 완료
-              </span>
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                {student.name}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {currentAssignment.wordlist_name}
+              </p>
             </div>
           </div>
-        </Card>
+        </div>
+      </header>
 
-        {/* 빠른 액션 */}
-        <div className="space-y-4">
-          {/* ⭐ 학습 상태 카드 */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">오늘의 학습</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {isGenerationCompleted 
-                    ? '🎉 모든 단어를 완료했습니다!' 
-                    : `${todayProgress}/${student.daily_goal} 완료`}
-                </p>
+      {/* 메인 콘텐츠 */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 통계 카드 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  학습 회차
+                </CardTitle>
+                <Calendar className="w-4 h-4 text-blue-600" />
               </div>
-              <Button 
-                size="lg" 
-                onClick={() => router.push(`/s/${token}`)}
-                disabled={isGenerationCompleted}
-                className="w-40"
-              >
-                <BookOpen className="mr-2 h-5 w-5" />
-                {isGenerationCompleted ? '학습 완료' : '학습 하기'}
-              </Button>
-            </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{completedSessionsCount}/{totalSessions}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sessions Completed
+              </p>
+            </CardContent>
           </Card>
 
-          {/* 평가 대기 중인 Day 알림 */}
-          {(() => {
-            const pendingTests = completedDays.filter(d => !d.test_completed)
-            if (pendingTests.length > 0) {
-              return (
-                <Card className="p-4 bg-yellow-50 border-yellow-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-yellow-800">평가 대기 중</h3>
-                      <p className="text-sm text-yellow-700">
-                        {pendingTests.length}개의 Day가 평가를 기다리고 있습니다
-                      </p>
-                    </div>
-                    <Button 
-                      size="lg" 
-                      variant="outline"
-                      onClick={() => router.push(`/s/${token}/test/${pendingTests[0].id}`)}
-                      className="w-40 border-yellow-300 hover:bg-yellow-100"
-                    >
-                      <Trophy className="mr-2 h-5 w-5" />
-                      평가 시작
-                    </Button>
-                  </div>
-                </Card>
-              )
-            }
-            return null
-          })()}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  평가 완료
+                </CardTitle>
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{oTestCompleted}/{completedSessionsCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                O-TEST Completed
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  추가 학습
+                </CardTitle>
+                <XCircle className="w-4 h-4 text-orange-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{xTestCompleted}/{completedSessionsCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                X-TEST Completed
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* 완성된 Day 목록 */}
-        <Card className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-5 w-5 text-blue-600" />
-            <h2 className="text-xl font-bold">완성된 Day</h2>
-            <Badge variant="outline">{completedDays.length}개</Badge>
-          </div>
-          
-          {completedDays.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>아직 완성된 Day가 없습니다.</p>
-              <p className="text-sm">학습을 시작해보세요!</p>
-            </div>
+        {/* 학습 버튼 */}
+        <Button 
+          size="lg" 
+          className="w-full h-14 text-lg mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          onClick={() => router.push(`/s/${token}`)}
+          disabled={isGenerationCompleted}
+        >
+          {isGenerationCompleted ? (
+            <>
+              <Award className="mr-2 h-5 w-5" />
+              학습 완료
+            </>
           ) : (
-            <div className="space-y-3">
-              {completedDays.map((day) => (
-                <div
-                  key={day.id}
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {day.generation}차
-                        </Badge>
-                        <span className="font-semibold">Day {day.day_number}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {day.word_count}개 완료 · {new Date(day.completed_date).toLocaleDateString('ko-KR')}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {day.test_completed && day.test_score !== null ? (
-                      <Badge 
-                        variant={day.test_score >= 80 ? "default" : "destructive"}
-                        className="text-sm px-3"
-                      >
-                        {day.test_score}점
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-sm">
-                        평가 대기
-                      </Badge>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => router.push(`/s/${token}/test/${day.id}`)}
-                    >
-                      {day.test_completed ? '결과 보기' : '평가 시작'}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <Play className="mr-2 h-5 w-5" />
+              학습 하기 {currentSession}/{totalSessions}회차
+            </>
           )}
-        </Card>
+        </Button>
 
-        {/* 통계 요약 */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="p-4 text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              {completedDays.length}
+        {/* 학습 기록 */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+              <CardTitle>학습 기록</CardTitle>
             </div>
-            <div className="text-sm text-muted-foreground mt-1">완성한 Day</div>
-          </Card>
-          
-          <Card className="p-4 text-center">
-            <div className="text-3xl font-bold text-green-600">
-              {currentAssignment.completed_words}
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">완료한 단어</div>
-          </Card>
-          
-          <Card className="p-4 text-center">
-            <div className="text-3xl font-bold text-purple-600">
-              {completedDays.filter(d => d.test_completed).length}
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">완료한 평가</div>
-          </Card>
-        </div>
-      </div>
+          </CardHeader>
+          <CardContent>
+            {completedSessions.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="font-medium">아직 완성된 회차가 없습니다</p>
+                <p className="text-sm mt-1">학습을 시작해보세요!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {completedSessions.map((session) => {
+                  const knownCount = session.word_count || 0
+                  const unknownCount = session.unknown_count || 0
+                  
+                  return (
+                    <Card key={session.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          {/* 왼쪽: 회차 정보 */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                              <Calendar className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-base">
+                                {session.session_number}회차 / {totalSessions}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {new Date(session.completed_date).toLocaleDateString('ko-KR', { 
+                                  month: 'long', 
+                                  day: 'numeric'
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 오른쪽: 테스트 버튼들 */}
+                          <div className="flex items-center gap-3">
+                            {/* O-TEST */}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                onClick={() => {
+                                  // TODO: 단어 목록 모달 표시
+                                  console.log('O 단어 목록 표시')
+                                }}
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                {knownCount}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1"
+                                onClick={() => router.push(`/s/${token}/test/${session.id}?type=known`)}
+                              >
+                                <Award className="w-3 h-3" />
+                                평가
+                              </Button>
+                            </div>
+                            
+                            {/* X-TEST */}
+                            {unknownCount > 0 && (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                  onClick={() => {
+                                    // TODO: 단어 목록 모달 표시
+                                    console.log('X 단어 목록 표시')
+                                  }}
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                  {unknownCount}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1"
+                                  onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
+                                >
+                                  <Award className="w-3 h-3" />
+                                  평가
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
     </div>
   )
 }

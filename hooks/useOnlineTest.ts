@@ -23,7 +23,10 @@ interface TestResult {
   correctWords: string[]
 }
 
-export function useOnlineTest(completedWordlistId: string) {
+export function useOnlineTest(
+  completedWordlistId: string,
+  testType: 'known' | 'unknown' = 'known'  // ⭐ 신규: O-TEST(기본) / X-TEST
+) {
   const [questions, setQuestions] = useState<Question[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<number, string>>({})
@@ -35,26 +38,37 @@ export function useOnlineTest(completedWordlistId: string) {
     completedCount: number
   } | null>(null)
 
-  // 평가 문제 생성 (20% 무작위)
+  // 평가 문제 생성 (O-TEST: 30%, X-TEST: 100%)
   useEffect(() => {
     async function generateQuestions() {
       try {
         // 1. 완성 단어장에서 word_ids 가져오기
         const { data: wordlistData, error: wordlistError } = await supabase
           .from('completed_wordlists')
-          .select('word_ids, student_id, day_number')
+          .select('word_ids, unknown_word_ids, student_id, session_number')
           .eq('id', completedWordlistId)
           .single()
 
         if (wordlistError) throw wordlistError
         if (!wordlistData) throw new Error('완성 단어장을 찾을 수 없습니다')
 
-        const wordIds = wordlistData.word_ids
-        const questionCount = Math.max(5, Math.floor(wordIds.length * 0.2)) // 최소 5개, 20%
+        // ⭐ testType에 따라 단어 선택
+        const wordIds = testType === 'known' 
+          ? wordlistData.word_ids                    // ✅ O-TEST: 안다 단어
+          : (wordlistData.unknown_word_ids || [])    // ❌ X-TEST: 모른다 단어
+
+        // ⭐ 평가 비율 설정
+        const TEST_PERCENTAGE = testType === 'known' ? 0.3 : 1.0  // O-TEST: 30%, X-TEST: 100%
+        const TEST_MIN_QUESTIONS = 5  // 최소 5문제
+        const questionCount = Math.max(TEST_MIN_QUESTIONS, Math.floor(wordIds.length * TEST_PERCENTAGE))
+        
+        const testTypeName = testType === 'known' ? 'O-TEST (안다)' : 'X-TEST (모른다)'
+        console.log(`📊 ${testTypeName} 평가 설정: ${TEST_PERCENTAGE * 100}% (최소 ${TEST_MIN_QUESTIONS}문제)`)
+        console.log(`📝 총 ${wordIds.length}개 중 ${questionCount}개 출제`)
 
         // 완성 단어장 정보 저장
         setCompletedWordlistInfo({
-          dayNumber: wordlistData.day_number,
+          dayNumber: wordlistData.session_number,
           completedCount: wordIds.length
         })
 
@@ -102,7 +116,7 @@ export function useOnlineTest(completedWordlistId: string) {
     if (completedWordlistId) {
       generateQuestions()
     }
-  }, [completedWordlistId])
+  }, [completedWordlistId, testType])  // ⭐ testType 추가
 
   // 답안 입력
   const handleAnswerChange = (value: string) => {

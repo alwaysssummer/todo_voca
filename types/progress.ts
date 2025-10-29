@@ -17,7 +17,7 @@ export interface CompletedWordlist {
   id: string
   student_id: string
   wordlist_id: string
-  day_number: number
+  session_number: number  // ⭐ day_number → session_number 변경
   word_ids: number[]
   completed_date: string
   online_test_completed: boolean

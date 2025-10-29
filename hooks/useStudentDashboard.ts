@@ -7,7 +7,7 @@ interface DashboardData {
   student: {
     id: string
     name: string
-    daily_goal: number
+    session_goal: number  // 회차당 목표
   }
   currentAssignment: {
     generation: number
@@ -16,11 +16,12 @@ interface DashboardData {
     completed_words: number
     filtered_word_ids: string[] | null
   }
-  completedDays: Array<{
+  completedSessions: Array<{
     id: string
-    day_number: number
+    session_number: number  // 회차 번호
     generation: number
     word_count: number
+    unknown_count: number  // 모른다 단어 개수
     completed_date: string
     test_completed: boolean
     test_score: number | null
@@ -79,14 +80,15 @@ export function useStudentDashboard(token: string) {
 
         const { count: completedCount } = await completedQuery
 
-        // 4. 완성된 Day 목록 (모든 세대)
-        const { data: completedDays, error: daysError } = await supabase
+        // 4. 완성된 회차 목록 (모든 세대)
+        const { data: completedSessions, error: sessionsError } = await supabase
           .from('completed_wordlists')
           .select(`
             id,
-            day_number,
+            session_number,
             generation,
             word_ids,
+            unknown_word_ids,
             completed_date,
             online_test_completed,
             online_tests (
@@ -94,20 +96,20 @@ export function useStudentDashboard(token: string) {
             )
           `)
           .eq('student_id', student.id)
-          .order('generation', { ascending: true })
-          .order('day_number', { ascending: true })
+          .order('session_number', { ascending: false })  // ⭐ 최신순으로 정렬
 
-        if (daysError) throw daysError
+        if (sessionsError) throw sessionsError
 
-        // 완성된 Day 데이터 변환
-        const formattedDays = (completedDays || []).map(day => ({
-          id: day.id,
-          day_number: day.day_number,
-          generation: day.generation,
-          word_count: day.word_ids?.length || 0,
-          completed_date: day.completed_date,
-          test_completed: day.online_test_completed,
-          test_score: day.online_tests?.[0]?.score || null
+        // 완성된 회차 데이터 변환
+        const formattedSessions = (completedSessions || []).map(session => ({
+          id: session.id,
+          session_number: session.session_number,
+          generation: session.generation,
+          word_count: session.word_ids?.length || 0,
+          unknown_count: session.unknown_word_ids?.length || 0,
+          completed_date: session.completed_date,
+          test_completed: session.online_test_completed,
+          test_score: session.online_tests?.[0]?.score || null
         }))
 
         // Supabase 관계형 데이터 안전하게 접근
@@ -117,7 +119,7 @@ export function useStudentDashboard(token: string) {
           student: {
             id: student.id,
             name: student.name,
-            daily_goal: student.daily_goal
+            session_goal: student.daily_goal
           },
           currentAssignment: {
             generation: assignment.generation,
@@ -126,7 +128,7 @@ export function useStudentDashboard(token: string) {
             completed_words: completedCount || 0,
             filtered_word_ids: assignment.filtered_word_ids
           },
-          completedDays: formattedDays
+          completedSessions: formattedSessions
         })
 
         setLoading(false)

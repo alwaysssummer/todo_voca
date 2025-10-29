@@ -30,7 +30,7 @@ export function TestStartScreen({
             온라인 평가
           </CardTitle>
           <p className="text-gray-600">
-            Day {dayNumber} · {completedCount}개 단어 완성
+            {dayNumber}회차 · {completedCount}개 단어 완성
           </p>
         </CardHeader>
 

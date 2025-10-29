@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStudySession } from '@/hooks/useStudySession'
@@ -27,6 +27,10 @@ export function StudyScreen({ token }: { token: string }) {
     handleDontKnow,
     confirmSkip,
     fetchNextWord,
+    showGenerationCompleteModal,
+    setShowGenerationCompleteModal,
+    generationModalData,
+    setGenerationModalData
   } = useStudySession(token)
 
   const [skipModalOpen, setSkipModalOpen] = useState(false)
@@ -35,12 +39,14 @@ export function StudyScreen({ token }: { token: string }) {
   
   const [goalModalOpen, setGoalModalOpen] = useState(false)
   const [completedWordlistData, setCompletedWordlistData] = useState<any>(null)
-  
-  const [generationModalOpen, setGenerationModalOpen] = useState(false)
-  const [generationModalData, setGenerationModalData] = useState<any>(null)
 
   // 중복 클릭 방지
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // "모른다" 강조 화면 상태
+  const [showDontKnowScreen, setShowDontKnowScreen] = useState(false)
+  const [dontKnowCountdown, setDontKnowCountdown] = useState(3)
+  const [dontKnowWord, setDontKnowWord] = useState<Word | null>(null)
 
   const onKnowClick = async () => {
     // 중복 클릭 방지
@@ -66,8 +72,7 @@ export function StudyScreen({ token }: { token: string }) {
             nextGenerationCreated: result.nextGenerationCreated || false,
             perfectCompletion: result.perfectCompletion || false
           })
-          // 세대 완료 모달 표시
-          setGenerationModalOpen(true)
+          // ⭐ 세대 완료 모달은 hook에서 자동으로 표시됨 (fetchNextWord에서 처리)
         } else {
           // 일일 목표만 달성 - 축하 모달 표시
           setGoalModalOpen(true)
@@ -83,35 +88,55 @@ export function StudyScreen({ token }: { token: string }) {
 
   const handleGoalModalClose = () => {
     setGoalModalOpen(false)
-    // Day 완료 후 진행률 새로고침 + 다음 Day의 첫 단어 로드
-    fetchNextWord(true)  // ⭐ forceRefresh=true로 progress 먼저 갱신
+    // 회차 완료 후 다음 단어 로드는 handleKnow에서 처리됨
   }
 
-  // ⭐ 페이지 로드 시 단어가 없으면 fetchNextWord 호출
-  useEffect(() => {
-    if (!loading && !error && !currentWord && student && currentAssignment) {
-      console.log('🔄 useEffect: 단어 없음, fetchNextWord 호출')
-      fetchNextWord(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, currentWord, student, currentAssignment])
-
   const onDontKnowClick = async () => {
+    if (!currentWord) return
+    
     try {
+      console.log('🔴 [모른다 클릭] 시작:', currentWord.word_text)
+      
+      // 현재 단어를 저장 (강조 화면에서 표시할 단어)
+      setDontKnowWord(currentWord)
+      
+      // 1. DB에 "모른다" 상태 저장
+      console.log('🔴 [모른다 클릭] handleDontKnow 호출...')
       const result = await handleDontKnow()
+      console.log('🔴 [모른다 클릭] handleDontKnow 완료:', result)
+      
       if (result) {
         setCurrentSkipCount(result.skipCount)
         
-        // Skip 횟수에 따른 모달 타입 결정
-        if (result.skipCount <= 2) {
-          setSkipModalType('minimal')
-        } else {
-          setSkipModalType('medium')
-        }
+        // 2. "모른다" 강조 화면 표시
+        setShowDontKnowScreen(true)
+        setDontKnowCountdown(3)
+        console.log('🔴 [모른다 클릭] 강조 화면 표시 시작')
         
-        setSkipModalOpen(true)
+        // 3. 카운트다운 시작
+        let countdown = 3
+        const countdownInterval = setInterval(() => {
+          countdown -= 1
+          setDontKnowCountdown(countdown)
+          console.log('🔴 [카운트다운]:', countdown)
+          if (countdown <= 0) {
+            clearInterval(countdownInterval)
+          }
+        }, 1000)
+        
+        // 4. 3초 후 강조 화면 숨기고 다음 단어 로드
+        setTimeout(async () => {
+          console.log('🔴 [3초 후] 강조 화면 숨김, 다음 단어 로드 시작')
+          setShowDontKnowScreen(false)
+          setDontKnowWord(null)
+          // 다음 단어 로드
+          console.log('🔴 [3초 후] fetchNextWord 호출...')
+          await fetchNextWord()
+          console.log('🔴 [3초 후] fetchNextWord 완료!')
+        }, 3000)
       }
     } catch (err) {
+      console.error('🔴 [모른다 처리 오류]:', err)
       alert('오류가 발생했습니다')
     }
   }
@@ -161,17 +186,17 @@ export function StudyScreen({ token }: { token: string }) {
   }
 
   if (!currentWord) {
-    // ⭐ 상태 명확화: Day 완료 vs 세대 완료 vs 로딩
-    const isDayComplete = progress.today >= progress.todayGoal
+    // ⭐ 상태 명확화: 회차 완료 vs 세대 완료 vs 로딩
+    const isSessionComplete = progress.today >= progress.todayGoal
     const isGenerationComplete = progress.generationCompleted >= progress.generationTotal
 
-    // 1. Day 완료 (오늘의 목표 달성)
-    if (isDayComplete) {
+    // 1. 회차 완료 (오늘의 목표 달성)
+    if (isSessionComplete) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="p-8 max-w-md text-center space-y-6">
             <div className="text-6xl">🎉</div>
-            <h2 className="text-2xl font-bold">Day {progress.day} 완료!</h2>
+            <h2 className="text-2xl font-bold">{progress.session}회차 완료!</h2>
             <p className="text-muted-foreground">
               오늘의 학습 목표를 달성했습니다
             </p>
@@ -256,7 +281,7 @@ export function StudyScreen({ token }: { token: string }) {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">{student.name}</h2>
-            <Badge variant="outline">Day {progress.day}</Badge>
+            <Badge variant="outline">{progress.session}회차</Badge>
             {currentAssignment && (
               <Badge 
                 variant={currentAssignment.generation === 1 ? "default" : "secondary"} 
@@ -414,13 +439,56 @@ export function StudyScreen({ token }: { token: string }) {
       {/* 세대 완료 모달 */}
       {generationModalData && (
         <GenerationCompleteModal
-          open={generationModalOpen}
-          onClose={() => setGenerationModalOpen(false)}
+          open={showGenerationCompleteModal}
+          onClose={() => setShowGenerationCompleteModal(false)}
           currentGeneration={generationModalData.currentGeneration}
           skippedCount={generationModalData.skippedCount}
           nextGenerationCreated={generationModalData.nextGenerationCreated}
           perfectCompletion={generationModalData.perfectCompletion}
         />
+      )}
+
+      {/* "모른다" 강조 화면 - Option 4 V1 */}
+      {showDontKnowScreen && dontKnowWord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <Card className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl">
+            <CardContent className="p-12 text-center space-y-6">
+              {/* 단어 (초대형) */}
+              <div className="text-6xl font-bold text-gray-900">
+                {dontKnowWord.word_text}
+              </div>
+              
+              {/* 뜻 (대형, 빨간색) */}
+              <div className="text-4xl text-red-600 font-semibold">
+                {dontKnowWord.meaning}
+              </div>
+              
+              {/* 예문 (있으면 표시) */}
+              {dontKnowWord.example && (
+                <div className="text-lg text-gray-600 pt-4 border-t-2 border-gray-200">
+                  {dontKnowWord.example}
+                </div>
+              )}
+              
+              {/* 카운트다운 */}
+              <div className="text-2xl text-gray-500 font-mono">
+                {dontKnowCountdown}
+              </div>
+              
+              {/* 프로그레스 바 */}
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="bg-red-500 h-full transition-all"
+                  style={{ 
+                    width: `${((3 - dontKnowCountdown) / 3) * 100}%`,
+                    transitionDuration: '1000ms',
+                    transitionTimingFunction: 'linear'
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   )

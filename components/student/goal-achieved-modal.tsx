@@ -64,7 +64,7 @@ export function GoalAchievedModal({
           {/* 통계 */}
           <div className="flex justify-center gap-4">
             <Badge variant="secondary" className="text-lg px-4 py-2">
-              Day {dayNumber}
+              {dayNumber}회차
             </Badge>
             <Badge variant="outline" className="text-lg px-4 py-2">
               {completedCount}/{goal}
@@ -75,7 +75,7 @@ export function GoalAchievedModal({
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-center gap-2 text-sm font-medium">
               <BookCheck className="h-4 w-4" />
-              <span>Day {dayNumber} 단어장 완성</span>
+              <span>{dayNumber}회차 단어장 완성</span>
             </div>
             <p className="text-xs text-muted-foreground">
               완료한 단어를 온라인 평가로 확인해보세요
