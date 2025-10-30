@@ -30,12 +30,23 @@ export function ExamPrintModal({
 }: ExamPrintModalProps) {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(false)
+  const [totalWords, setTotalWords] = useState(0) // 추출 전 전체 단어 수
 
   useEffect(() => {
     if (open && sessionIds.length > 0) {
       loadWords()
     }
   }, [open, sessionIds, type])
+
+  // Fisher-Yates Shuffle 알고리즘
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
+  }
 
   const loadWords = async () => {
     setLoading(true)
@@ -87,11 +98,26 @@ export function ExamPrintModal({
 
       if (wordError) throw wordError
 
-      console.log('가져온 단어 수:', wordData?.length || 0)
-      setWords(wordData || [])
+      const allWords = wordData || []
+      console.log('가져온 전체 단어 수:', allWords.length)
+      setTotalWords(allWords.length)
+
+      // 랜덤 추출: known은 30%, unknown은 70%
+      const percentage = type === 'known' ? 0.3 : 0.7
+      const targetCount = Math.ceil(allWords.length * percentage)
+      
+      console.log(`${type === 'known' ? '30%' : '70%'} 추출:`, targetCount, '개')
+
+      // Fisher-Yates Shuffle로 랜덤화 후 필요한 개수만 추출
+      const shuffled = shuffleArray(allWords)
+      const selectedWords = shuffled.slice(0, targetCount)
+
+      console.log('최종 선택된 단어:', selectedWords.length, '개')
+      setWords(selectedWords)
     } catch (error) {
       console.error('단어 로드 실패:', error)
       setWords([])
+      setTotalWords(0)
     } finally {
       setLoading(false)
     }
@@ -130,11 +156,13 @@ export function ExamPrintModal({
           <div className="space-y-4">
             {/* 디버그 정보 */}
             <div className="bg-blue-50 p-4 rounded-lg text-sm">
-              <p className="font-semibold mb-2">수집된 단어 정보:</p>
+              <p className="font-semibold mb-2">시험지 단어 추출 정보:</p>
               <ul className="space-y-1 text-muted-foreground">
                 <li>• 선택한 회차: {sessionIds.length}개</li>
-                <li>• 수집된 단어: {words.length}개 (중복 제거 완료)</li>
-                <li>• 타입: {type === 'known' ? '아는 단어' : '모르는 단어'}</li>
+                <li>• 전체 {type === 'known' ? '아는' : '모르는'} 단어: {totalWords}개 (중복 제거 완료)</li>
+                <li>• 추출 비율: {type === 'known' ? '30%' : '70%'}</li>
+                <li>• 추출된 시험지 단어: <strong className="text-blue-600">{words.length}개</strong></li>
+                <li className="text-xs text-orange-600 mt-2">💡 모달을 닫았다가 다시 열면 랜덤으로 다시 추출됩니다</li>
               </ul>
             </div>
 
