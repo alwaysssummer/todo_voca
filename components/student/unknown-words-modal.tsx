@@ -113,7 +113,7 @@ export function UnknownWordsModal({
 
       {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
       {open && words.length > 0 && (
-        <div className="hidden print:block">
+        <div className="print:block">
           <div className="print-page">
             {/* 제목 */}
             <h1 className="text-2xl font-bold mb-8">
@@ -135,6 +135,13 @@ export function UnknownWordsModal({
 
           {/* 인쇄 전용 스타일 */}
           <style jsx>{`
+            /* 화면에서는 숨김 */
+            @media screen {
+              .print-page {
+                display: none;
+              }
+            }
+            
             @media print {
               /* 페이지 설정 */
               @page {
