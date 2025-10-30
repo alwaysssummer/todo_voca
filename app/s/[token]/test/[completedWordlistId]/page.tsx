@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { TestStartScreen } from '@/components/student/test-start-screen'
 import { TestQuestionScreen } from '@/components/student/test-question-screen'
 import { TestResultScreen } from '@/components/student/test-result-screen'
@@ -10,9 +10,13 @@ import { useRouter } from 'next/navigation'
 
 export default function OnlineTestPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const token = params.token as string
   const completedWordlistId = params.completedWordlistId as string
+  
+  // ⭐ URL에서 test type 파라미터 읽기 (O-TEST: known, X-TEST: unknown)
+  const testType = (searchParams.get('type') as 'known' | 'unknown') || 'known'
 
   // ⭐ 바로 평가 시작 (시작 화면 건너뛰기)
   const [testStarted, setTestStarted] = useState(true)
@@ -32,7 +36,7 @@ export default function OnlineTestPage() {
     canGoNext,
     canGoPrevious,
     currentAnswer
-  } = useOnlineTest(completedWordlistId)
+  } = useOnlineTest(completedWordlistId, testType)
 
   const handleStartTest = () => {
     setTestStarted(true)
