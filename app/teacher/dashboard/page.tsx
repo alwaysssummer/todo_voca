@@ -12,7 +12,6 @@ import {
   LogOut,
   Plus,
   Eye,
-  Link as LinkIcon,
   Trash2,
   CheckCircle2,
   XCircle
@@ -233,10 +232,9 @@ export default function TeacherDashboard() {
     router.push('/teacher/login')
   }
 
-  const copyAccessLink = (token: string) => {
+  const openStudentDashboard = (token: string) => {
     const link = `${window.location.origin}/s/${token}/dashboard`
-    navigator.clipboard.writeText(link)
-    alert('접속 링크가 복사되었습니다!')
+    window.open(link, '_blank')
   }
 
   const openAssignDialog = (studentId: string, studentName: string) => {
@@ -550,20 +548,11 @@ export default function TeacherDashboard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => copyAccessLink(student.accessToken)}
+                        onClick={() => openStudentDashboard(student.accessToken)}
                         className="gap-2"
-                      >
-                        <LinkIcon className="w-3 h-3" />
-                        링크
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="gap-2"
-                        onClick={() => router.push(`/teacher/students/${student.id}`)}
                       >
                         <Eye className="w-3 h-3" />
-                        상세
+                        보기
                       </Button>
                       <Button
                         size="sm"
