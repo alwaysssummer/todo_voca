@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,7 @@ import {
   Play,
   Award
 } from 'lucide-react'
+import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -24,6 +26,14 @@ interface StudentDashboardProps {
 export function StudentDashboard({ token }: StudentDashboardProps) {
   const router = useRouter()
   const { data, loading, error } = useStudentDashboard(token)
+  
+  // 모르는 단어 모달 state
+  const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<{
+    id: string
+    sessionNumber: number
+    unknownCount: number
+  } | null>(null)
 
   if (loading) {
     return (
@@ -245,8 +255,12 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                   size="sm"
                                   className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                                   onClick={() => {
-                                    // TODO: 단어 목록 모달 표시
-                                    console.log('X 단어 목록 표시')
+                                    setSelectedSession({
+                                      id: session.id,
+                                      sessionNumber: session.session_number,
+                                      unknownCount: unknownCount
+                                    })
+                                    setUnknownWordsOpen(true)
                                   }}
                                 >
                                   <XCircle className="w-4 h-4" />
@@ -274,6 +288,20 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
           </CardContent>
         </Card>
       </main>
+
+      {/* 모르는 단어 모달 */}
+      {selectedSession && (
+        <UnknownWordsModal
+          open={unknownWordsOpen}
+          onClose={() => {
+            setUnknownWordsOpen(false)
+            setSelectedSession(null)
+          }}
+          sessionId={selectedSession.id}
+          sessionNumber={selectedSession.sessionNumber}
+          unknownCount={selectedSession.unknownCount}
+        />
+      )}
     </div>
   )
 }
