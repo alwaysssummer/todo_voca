@@ -346,7 +346,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 }}
                               >
                                 <CheckCircle2 className="w-4 h-4" />
-                                {String(knownCount).padStart(2, ' ')}
+                                <span className="inline-block min-w-[1.25rem] text-center">{knownCount}</span>
                               </Button>
                               
                               {/* O-TEST 평가 상태 */}
@@ -395,7 +395,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 disabled={unknownCount === 0}
                               >
                                 <XCircle className="w-4 h-4" />
-                                {String(unknownCount).padStart(2, ' ')}
+                                <span className="inline-block min-w-[1.25rem] text-center">{unknownCount}</span>
                               </Button>
                               
                               {/* X-TEST 평가 상태 */}
