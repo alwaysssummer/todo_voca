@@ -95,38 +95,29 @@ export function UnknownWordsModal({
         {/* 인쇄 전용 스타일 */}
         <style dangerouslySetInnerHTML={{__html: `
           @media print {
-            /* 다른 모든 요소 완전히 제거 (공간까지 제거) */
-            body > *:not(#print-only-content) {
-              display: none !important;
-            }
-            
-            /* 모달도 완전히 제거 */
-            [data-radix-dialog-overlay],
-            [data-radix-dialog-content],
-            [data-radix-portal] {
-              display: none !important;
+            /* 모든 일반 콘텐츠 숨기기 */
+            body * {
+              visibility: hidden;
             }
             
             /* 인쇄 콘텐츠만 표시 */
+            #print-only-content,
+            #print-only-content * {
+              visibility: visible !important;
+            }
+            
             #print-only-content {
-              display: block !important;
-              position: static !important;
-              left: auto !important;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
               width: 100% !important;
-              margin: 0 !important;
-              padding: 0 !important;
+              display: block !important;
             }
             
             /* 페이지 설정 */
             @page {
               size: A4;
               margin: 2cm;
-            }
-            
-            /* body 높이 제한 */
-            body {
-              height: auto !important;
-              overflow: visible !important;
             }
           }
         `}} />
