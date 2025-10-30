@@ -193,11 +193,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* 헤더 */}
       <header className="bg-white border-b shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{student.name}</span>
-            <span>·</span>
-            <span>{currentAssignment.wordlist_name}</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-3">
+            <BookOpen className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-lg">{student.name}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-sm text-muted-foreground">{currentAssignment.wordlist_name}</span>
+            </div>
           </div>
         </div>
       </header>
