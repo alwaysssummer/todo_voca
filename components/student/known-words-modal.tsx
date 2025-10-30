@@ -106,42 +106,44 @@ export function KnownWordsModal({
               visibility: visible !important;
             }
             
-            /* 페이지 설정 - 여백 포함 */
+            /* 페이지 설정 - 여백 제거 */
             @page {
               size: A4;
-              margin: 2cm;
+              margin: 0;
             }
             
-            /* HTML, Body 완전 제약 */
-            html, body {
-              width: 100% !important;
-              height: 297mm !important;
-              max-height: 297mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
+            /* HTML 제약 */
+            html {
+              height: 100% !important;
               overflow: hidden !important;
-              page-break-after: avoid !important;
-              page-break-before: avoid !important;
             }
             
-            /* 인쇄 콘텐츠 배치 및 높이 제한 */
+            /* Body에서 여백 처리 및 높이 제한 */
+            body {
+              margin: 2cm !important;
+              padding: 0 !important;
+              width: calc(210mm - 4cm) !important;
+              height: calc(297mm - 4cm) !important;
+              max-height: calc(297mm - 4cm) !important;
+              overflow: hidden !important;
+              box-sizing: border-box !important;
+            }
+            
+            /* 인쇄 콘텐츠 배치 */
             #print-only-content-known {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
+              position: relative !important;
               width: 100% !important;
-              max-width: 100% !important;
-              height: auto !important;
-              max-height: calc(297mm - 4cm) !important; /* A4 높이 - 상하 여백 */
+              height: 100% !important;
+              max-height: 100% !important;
               display: block !important;
               overflow: hidden !important;
               page-break-after: avoid !important;
-              page-break-before: avoid !important;
               page-break-inside: avoid !important;
             }
             
             /* 내부 요소들도 페이지 분할 방지 */
-            #print-only-content-known * {
+            #print-only-content-known h1,
+            #print-only-content-known > div {
               page-break-inside: avoid !important;
               page-break-after: avoid !important;
             }
