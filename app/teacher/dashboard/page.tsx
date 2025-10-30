@@ -130,7 +130,6 @@ export default function TeacherDashboard() {
             .select('*', { count: 'exact', head: true })
             .eq('student_id', student.id)
             .eq('test_type', 'known')
-            .eq('completed', true)
 
           // 4. X-TEST 완료 회차 (실제 완료 + 자동 완료)
           const { count: xTestCompletedReal } = await supabase
@@ -138,7 +137,6 @@ export default function TeacherDashboard() {
             .select('*', { count: 'exact', head: true })
             .eq('student_id', student.id)
             .eq('test_type', 'unknown')
-            .eq('completed', true)
 
           // X-TEST 자동 완료 (unknown_word_ids가 0개인 회차)
           const { data: allCompleted } = await supabase
