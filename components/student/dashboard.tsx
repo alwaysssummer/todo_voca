@@ -18,6 +18,7 @@ import {
   Award
 } from 'lucide-react'
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
+import { KnownWordsModal } from '@/components/student/known-words-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -33,6 +34,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     id: string
     sessionNumber: number
     unknownCount: number
+  } | null>(null)
+
+  // 아는 단어 모달 state
+  const [knownWordsOpen, setKnownWordsOpen] = useState(false)
+  const [selectedKnownSession, setSelectedKnownSession] = useState<{
+    id: string
+    sessionNumber: number
+    knownCount: number
   } | null>(null)
 
   if (loading) {
@@ -229,8 +238,12 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 size="sm"
                                 className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50"
                                 onClick={() => {
-                                  // TODO: 단어 목록 모달 표시
-                                  console.log('O 단어 목록 표시')
+                                  setSelectedKnownSession({
+                                    id: session.id,
+                                    sessionNumber: session.session_number,
+                                    knownCount: knownCount
+                                  })
+                                  setKnownWordsOpen(true)
                                 }}
                               >
                                 <CheckCircle2 className="w-4 h-4" />
@@ -300,6 +313,20 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
           sessionId={selectedSession.id}
           sessionNumber={selectedSession.sessionNumber}
           unknownCount={selectedSession.unknownCount}
+        />
+      )}
+
+      {/* 아는 단어 모달 */}
+      {selectedKnownSession && (
+        <KnownWordsModal
+          open={knownWordsOpen}
+          onClose={() => {
+            setKnownWordsOpen(false)
+            setSelectedKnownSession(null)
+          }}
+          sessionId={selectedKnownSession.id}
+          sessionNumber={selectedKnownSession.sessionNumber}
+          knownCount={selectedKnownSession.knownCount}
         />
       )}
     </div>
