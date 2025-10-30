@@ -231,7 +231,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                 <p className="text-sm mt-1">학습을 시작해보세요!</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {/* 전체 선택 + 출력 버튼들 */}
                 <div className="flex items-center justify-between gap-2 pb-3 border-b flex-wrap">
                   {/* 왼쪽: 전체 선택 */}
@@ -309,7 +309,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                   
                   return (
                     <Card key={session.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
+                      <CardContent className="p-3">
                         <div className="flex items-center justify-between">
                           {/* 왼쪽: 체크박스 + 회차 정보 */}
                           <div className="flex items-center gap-3">
