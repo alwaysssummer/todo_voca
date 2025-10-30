@@ -59,7 +59,7 @@ export function useOnlineTest(
 
         // ⭐ 평가 비율 설정
         const TEST_PERCENTAGE = testType === 'known' ? 0.3 : 1.0  // O-TEST: 30%, X-TEST: 100%
-        const TEST_MIN_QUESTIONS = 5  // 최소 5문제
+        const TEST_MIN_QUESTIONS = 3  // 최소 3문제 (30%에 가깝게)
         const questionCount = Math.max(TEST_MIN_QUESTIONS, Math.floor(wordIds.length * TEST_PERCENTAGE))
         
         const testTypeName = testType === 'known' ? 'O-TEST (안다)' : 'X-TEST (모른다)'
@@ -201,6 +201,7 @@ export function useOnlineTest(
         await supabase.from('online_tests').insert({
           student_id: completedWordlist.student_id,
           completed_wordlist_id: completedWordlistId,
+          test_type: testType,  // ⭐ O-TEST('known') 또는 X-TEST('unknown')
           total_questions: questions.length,
           correct_count: correctCount,
           score: score,
