@@ -38,7 +38,6 @@ export function UnknownWordsModal({
   const loadWords = async () => {
     setLoading(true)
     try {
-      // 1. unknown_word_ids 가져오기
       const { data: session } = await supabase
         .from('completed_wordlists')
         .select('unknown_word_ids')
@@ -46,7 +45,6 @@ export function UnknownWordsModal({
         .single()
 
       if (session?.unknown_word_ids && session.unknown_word_ids.length > 0) {
-        // 2. 단어 정보 가져오기
         const { data: wordData } = await supabase
           .from('words')
           .select('word_text, meaning, sequence_order')
@@ -63,14 +61,133 @@ export function UnknownWordsModal({
   }
 
   const handlePrint = () => {
-    window.print()
+    // 렌더링 완료 대기
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  }
+
+  // 인쇄용 HTML을 완전히 독립적으로 생성
+  const renderPrintContent = () => {
+    if (!open || words.length === 0) return null
+
+    const leftColumn: Word[] = []
+    const rightColumn: Word[] = []
+    
+    // 좌우 컬럼 분배 (좌측 먼저 채우기)
+    words.forEach((word, index) => {
+      if (index < Math.ceil(words.length / 2)) {
+        leftColumn.push(word)
+      } else {
+        rightColumn.push(word)
+      }
+    })
+
+    return (
+      <div
+        id="print-only-content"
+        style={{
+          display: 'none',
+          position: 'absolute',
+          left: '-9999px'
+        }}
+      >
+        {/* 인쇄 전용 스타일 */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            /* 모든 일반 콘텐츠 숨기기 */
+            body * {
+              visibility: hidden;
+            }
+            
+            /* 인쇄 콘텐츠만 표시 */
+            #print-only-content,
+            #print-only-content * {
+              visibility: visible !important;
+            }
+            
+            #print-only-content {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              display: block !important;
+            }
+            
+            /* 페이지 설정 */
+            @page {
+              size: A4;
+              margin: 2cm;
+            }
+          }
+        `}} />
+
+        {/* 제목 */}
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: 'bold',
+          marginBottom: '32px',
+          color: '#000'
+        }}>
+          {sessionNumber}회차 - 모르는 단어 ({unknownCount}개)
+        </h1>
+
+        {/* 2단 레이아웃 */}
+        <div style={{
+          display: 'flex',
+          gap: '4rem',
+          color: '#000'
+        }}>
+          {/* 좌측 컬럼 */}
+          <div style={{
+            flex: 1,
+            borderRight: '1px solid #d1d5db',
+            paddingRight: '2rem'
+          }}>
+            {leftColumn.map((word, index) => (
+              <div
+                key={index}
+                style={{
+                  marginBottom: '12px',
+                  lineHeight: '1.8',
+                  fontSize: '14px',
+                  pageBreakInside: 'avoid'
+                }}
+              >
+                {index + 1}. {word.word_text} : {word.meaning}
+              </div>
+            ))}
+          </div>
+
+          {/* 우측 컬럼 */}
+          <div style={{
+            flex: 1,
+            paddingLeft: '2rem'
+          }}>
+            {rightColumn.map((word, index) => (
+              <div
+                key={index}
+                style={{
+                  marginBottom: '12px',
+                  lineHeight: '1.8',
+                  fontSize: '14px',
+                  pageBreakInside: 'avoid'
+                }}
+              >
+                {leftColumn.length + index + 1}. {word.word_text} : {word.meaning}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
     <>
       {/* 화면용 모달 */}
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto print:hidden">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-xl">
@@ -80,6 +197,7 @@ export function UnknownWordsModal({
                 onClick={handlePrint}
                 className="gap-2"
                 variant="outline"
+                disabled={loading || words.length === 0}
               >
                 <Printer className="w-4 h-4" />
                 인쇄하기
@@ -110,22 +228,8 @@ export function UnknownWordsModal({
         </DialogContent>
       </Dialog>
 
-      {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
-      {open && words.length > 0 && (
-        <div className="screen-only">
-          <h1 className="text-2xl font-bold mb-8">
-            {sessionNumber}회차 - 모르는 단어 ({unknownCount}개)
-          </h1>
-          
-          <div className="print-columns">
-            {words.map((word, index) => (
-              <div key={index} className="print-word">
-                {index + 1}. {word.word_text} : {word.meaning}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* 인쇄 전용 콘텐츠 */}
+      {renderPrintContent()}
     </>
   )
 }
