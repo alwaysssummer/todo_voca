@@ -37,34 +37,49 @@ export function UnknownWordsModal({
 
   const loadWords = async () => {
     setLoading(true)
+    console.log('🔵 loadWords 시작:', { sessionId, open })
+    
     try {
       // 1. unknown_word_ids 가져오기
-      const { data: session } = await supabase
+      const { data: session, error: sessionError } = await supabase
         .from('completed_wordlists')
         .select('unknown_word_ids')
         .eq('id', sessionId)
         .single()
 
+      console.log('📊 session 데이터:', session)
+      console.log('❌ session 에러:', sessionError)
+
       if (session?.unknown_word_ids && session.unknown_word_ids.length > 0) {
+        console.log('✅ unknown_word_ids:', session.unknown_word_ids)
+        
         // 2. 단어 정보 가져오기
-        const { data: wordData } = await supabase
+        const { data: wordData, error: wordError } = await supabase
           .from('words')
           .select('word_text, meaning, sequence_order')
           .in('id', session.unknown_word_ids)
           .order('sequence_order')
 
+        console.log('📚 words 데이터:', wordData)
+        console.log('❌ words 에러:', wordError)
+        
         setWords(wordData || [])
+      } else {
+        console.log('⚠️ unknown_word_ids가 비어있음')
       }
     } catch (error) {
-      console.error('단어 로드 실패:', error)
+      console.error('❌ 단어 로드 실패:', error)
     } finally {
       setLoading(false)
+      console.log('✅ loadWords 완료, words.length:', words.length)
     }
   }
 
   const handlePrint = () => {
     window.print()
   }
+
+  console.log('🎨 렌더링:', { open, loading, wordsLength: words.length, sessionId })
 
   return (
     <>
@@ -99,9 +114,10 @@ export function UnknownWordsModal({
           ) : (
             /* 2단 컬럼 레이아웃 (좌측 먼저 채우기) */
             <div className="columns-1 md:columns-2 gap-8 py-4">
+              {console.log('📝 렌더링할 단어들:', words)}
               {words.map((word, index) => (
                 <div key={index} className="flex gap-2 text-base mb-3 break-inside-avoid">
-                  <span className="font-medium">{word.word_text}</span>
+                  <span className="font-medium">{index + 1}. {word.word_text}</span>
                   <span className="text-muted-foreground">:</span>
                   <span className="text-muted-foreground">{word.meaning}</span>
                 </div>
@@ -112,7 +128,7 @@ export function UnknownWordsModal({
       </Dialog>
 
       {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
-      {open && words.length > 0 && (
+      {open && (
         <div className="print:block">
           <div className="print-page">
             {/* 제목 */}
@@ -121,16 +137,18 @@ export function UnknownWordsModal({
             </h1>
 
             {/* 단어 목록 (2단 컬럼) */}
-            <div className="word-columns">
-              {words.map((word, index) => (
-                <div key={index} className="word-item">
-                  <span className="word-number">{index + 1}. </span>
-                  <span className="word-text">{word.word_text}</span>
-                  <span className="separator"> : </span>
-                  <span className="word-meaning">{word.meaning}</span>
-                </div>
-              ))}
-            </div>
+            {words.length > 0 && (
+              <div className="word-columns">
+                {words.map((word, index) => (
+                  <div key={index} className="word-item">
+                    <span className="word-number">{index + 1}. </span>
+                    <span className="word-text">{word.word_text}</span>
+                    <span className="separator"> : </span>
+                    <span className="word-meaning">{word.meaning}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 인쇄 전용 스타일 */}
