@@ -389,53 +389,62 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                               </div>
                             </div>
                             
-                            {/* X-TEST */}
-                            {unknownCount > 0 && (
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  onClick={() => {
+                            {/* X-TEST - 항상 표시 */}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                onClick={() => {
+                                  if (unknownCount > 0) {
                                     setSelectedSession({
                                       id: session.id,
                                       sessionNumber: session.session_number,
                                       unknownCount: unknownCount
                                     })
                                     setUnknownWordsOpen(true)
-                                  }}
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                  {unknownCount}
-                                </Button>
-                                
-                                {/* X-TEST 평가 상태 */}
-                                <div className="min-w-[4.5rem] flex items-center justify-center">
-                                  {session.x_test_completed ? (
-                                    // 평가 완료: 점수 표시
-                                    <div className="flex items-center gap-1.5">
-                                      <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-                                      <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
-                                        {session.x_test_correct}/{session.x_test_total}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    // 평가 전: 회색 원 버튼 + 투명 텍스트로 공간 확보
-                                    <div className="relative flex items-center justify-center">
-                                      <button
-                                        className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
-                                        onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
-                                        title="X-TEST 평가 시작"
-                                        aria-label="X-TEST 평가 시작하기"
-                                      />
-                                      <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
-                                        0/0
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
+                                  }
+                                }}
+                                disabled={unknownCount === 0}
+                              >
+                                <XCircle className="w-4 h-4" />
+                                {unknownCount}
+                              </Button>
+                              
+                              {/* X-TEST 평가 상태 */}
+                              <div className="min-w-[4.5rem] flex items-center justify-center">
+                                {unknownCount === 0 ? (
+                                  // 모르는 단어 없음: 자동 완료 표시 (0/0)
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
+                                      0/0
+                                    </span>
+                                  </div>
+                                ) : session.x_test_completed ? (
+                                  // 평가 완료: 점수 표시
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
+                                      {session.x_test_correct}/{session.x_test_total}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  // 평가 전: 회색 원 버튼 + 투명 텍스트로 공간 확보
+                                  <div className="relative flex items-center justify-center">
+                                    <button
+                                      className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                                      onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
+                                      title="X-TEST 평가 시작"
+                                      aria-label="X-TEST 평가 시작하기"
+                                    />
+                                    <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
+                                      0/0
+                                    </span>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </div>
                         </div>
                       </CardContent>
