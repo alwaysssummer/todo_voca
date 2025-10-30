@@ -1,11 +1,9 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
-import { ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TestQuestionScreenProps {
@@ -59,10 +57,7 @@ export function TestQuestionScreen({
         <Card className="w-full max-w-2xl shadow-xl">
           <CardContent className="p-8 space-y-8">
             {/* 단어 표시 */}
-            <div className="text-center space-y-4">
-              <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">
-                다음 단어의 뜻은?
-              </p>
+            <div className="text-center">
               <div className="py-8 px-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-200">
                 <h1 className="text-4xl md:text-5xl font-bold text-gray-800 break-words">
                   {word}
@@ -106,27 +101,6 @@ export function TestQuestionScreen({
                 </div>
               ))}
             </RadioGroup>
-            
-            <p className="text-xs text-gray-500 text-center">
-              답변 완료: {answeredCount} / {totalQuestions}
-            </p>
-
-            {/* 네비게이션 버튼 - 이전만 표시 */}
-            <div className="flex flex-col gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={onPrevious}
-                disabled={!canGoPrevious}
-                className="w-full py-6"
-              >
-                <ChevronLeft className="w-5 h-5 mr-1" />
-                이전 문제
-              </Button>
-              
-              <p className="text-xs text-gray-500 text-center">
-                💡 답을 선택하면 자동으로 다음 문제로 넘어갑니다
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
