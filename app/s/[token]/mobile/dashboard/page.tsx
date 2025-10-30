@@ -1,12 +1,13 @@
 import { MobileDashboard } from '@/components/student/mobile-dashboard'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     token: string
-  }
+  }>
 }
 
-export default function MobileDashboardPage({ params }: PageProps) {
-  return <MobileDashboard token={params.token} />
+export default async function MobileDashboardPage({ params }: PageProps) {
+  const { token } = await params
+  return <MobileDashboard token={token} />
 }
 
