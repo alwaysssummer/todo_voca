@@ -87,16 +87,19 @@ CREATE INDEX idx_progress_status ON student_word_progress(status);
 CREATE INDEX idx_progress_next_date ON student_word_progress(next_appear_date);
 CREATE INDEX idx_progress_composite ON student_word_progress(student_id, status, next_appear_date);
 
--- 6. completed_wordlists 테이블 (완성 단어장 - Day 단위)
+-- 6. completed_wordlists 테이블 (완성 단어장 - Session 단위)
 CREATE TABLE completed_wordlists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES users(id) ON DELETE CASCADE,
     wordlist_id UUID REFERENCES wordlists(id) ON DELETE CASCADE,
-    day_number INT NOT NULL,
-    word_ids INT[] NOT NULL,
+    session_number INT NOT NULL,          -- day_number에서 session_number로 변경
+    word_ids INT[] NOT NULL,              -- 안다고 표시한 단어 ID 배열
+    unknown_word_ids INT[],               -- 모른다고 표시한 단어 ID 배열 (X-TEST용)
     completed_date DATE NOT NULL,
     online_test_completed BOOLEAN DEFAULT FALSE,
     online_test_score INT,
+    assignment_id UUID REFERENCES student_wordlists(id) ON DELETE CASCADE,
+    generation INT DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
