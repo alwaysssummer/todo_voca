@@ -95,10 +95,10 @@ export function UnknownWordsModal({
             단어가 없습니다
           </div>
         ) : (
-          /* 2단 리스트 */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 py-4 print:gap-y-3">
+          /* 2단 컬럼 레이아웃 (좌측 먼저 채우기) */
+          <div className="columns-1 md:columns-2 gap-8 py-4">
             {words.map((word, index) => (
-              <div key={index} className="flex gap-2 text-base">
+              <div key={index} className="flex gap-2 text-base mb-3 break-inside-avoid">
                 <span className="font-medium">{word.word_text}</span>
                 <span className="text-muted-foreground">:</span>
                 <span className="text-muted-foreground">{word.meaning}</span>
@@ -110,24 +110,45 @@ export function UnknownWordsModal({
         {/* 인쇄 스타일 */}
         <style jsx global>{`
           @media print {
-            /* 모달 배경/오버레이 제거 */
-            body * { visibility: hidden; }
-            [role="dialog"], [role="dialog"] * { visibility: visible; }
-            [role="dialog"] { 
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              box-shadow: none;
-              border: none;
-            }
-            /* A4 페이지 설정 */
+            /* 페이지 설정 */
             @page { 
               size: A4; 
               margin: 2cm; 
             }
-            /* 닫기 버튼 숨김 */
-            button[aria-label="Close"] { display: none !important; }
+            
+            /* 모달 오버레이 숨김 */
+            [data-radix-dialog-overlay] {
+              display: none !important;
+            }
+            
+            /* 모달 컨테이너 스타일 초기화 */
+            [data-radix-dialog-content] {
+              position: static !important;
+              transform: none !important;
+              max-width: 100% !important;
+              max-height: 100% !important;
+              box-shadow: none !important;
+              border: none !important;
+              padding: 1rem !important;
+              margin: 0 !important;
+            }
+            
+            /* 닫기 버튼 및 인쇄 버튼 숨김 */
+            button[aria-label="Close"],
+            .print\\:hidden {
+              display: none !important;
+            }
+            
+            /* 단어 항목이 페이지 나눔 방지 */
+            .break-inside-avoid {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+            
+            /* 컬럼 간격 조정 */
+            .columns-2 {
+              column-gap: 3rem;
+            }
           }
         `}</style>
       </DialogContent>
