@@ -132,13 +132,13 @@ export function useStudentDashboard(token: string) {
             test_score: session.online_tests?.[0]?.score || null,
             // O-TEST (아는 단어 평가)
             o_test_completed: !!oTest,
-            o_test_correct: oTest?.correct_count || null,
-            o_test_total: oTest?.total_questions || null,
+            o_test_correct: oTest?.correct_count ?? 0,
+            o_test_total: oTest?.total_questions ?? 0,
             o_test_wrong_word_ids: oTest?.wrong_word_ids || null,
             // X-TEST (모르는 단어 평가)
             x_test_completed: !!xTest,
-            x_test_correct: xTest?.correct_count || null,
-            x_test_total: xTest?.total_questions || null,
+            x_test_correct: xTest?.correct_count ?? 0,
+            x_test_total: xTest?.total_questions ?? 0,
             x_test_wrong_word_ids: xTest?.wrong_word_ids || null
           }
         })
