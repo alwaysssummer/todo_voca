@@ -115,6 +115,18 @@ export function ExamPrintModal({
               width: 100% !important;
               display: block !important;
             }
+            
+            /* 답지 섹션: 홀수 페이지부터 시작 */
+            .answer-section {
+              page-break-before: always !important;
+            }
+            
+            /* 시험지가 짝수 페이지로 끝나면 빈 페이지 추가되어 답지가 홀수 페이지에서 시작 */
+            @supports (break-after: left) {
+              .exam-section {
+                break-after: left;
+              }
+            }
           }
         `}} />
 
