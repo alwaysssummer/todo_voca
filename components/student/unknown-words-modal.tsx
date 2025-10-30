@@ -153,10 +153,13 @@ export function UnknownWordsModal({
 
           {/* 인쇄 전용 스타일 */}
           <style jsx>{`
-            /* 화면에서는 숨김 */
+            /* 화면에서는 화면 밖으로 숨김 (DOM에는 유지) */
             @media screen {
               .print-page {
-                display: none;
+                position: absolute !important;
+                left: -9999px !important;
+                visibility: hidden !important;
+                pointer-events: none !important;
               }
             }
             
@@ -169,6 +172,9 @@ export function UnknownWordsModal({
 
               /* 인쇄 레이아웃 */
               .print-page {
+                position: static !important;
+                left: auto !important;
+                visibility: visible !important;
                 width: 100%;
                 height: 100%;
                 padding: 0;
