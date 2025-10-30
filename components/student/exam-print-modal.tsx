@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, X, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Word {
@@ -46,6 +46,134 @@ export function ExamPrintModal({
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
     return shuffled
+  }
+
+  // 인쇄 핸들러
+  const handlePrint = () => {
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  }
+
+  // 인쇄용 콘텐츠 렌더링
+  const renderPrintContent = () => {
+    if (!open || words.length === 0) return null
+
+    const leftColumn: Word[] = []
+    const rightColumn: Word[] = []
+    
+    // 좌우 컬럼 분배 (좌측 먼저 채우기)
+    words.forEach((word, index) => {
+      if (index < Math.ceil(words.length / 2)) {
+        leftColumn.push(word)
+      } else {
+        rightColumn.push(word)
+      }
+    })
+
+    return (
+      <div
+        id="exam-print-content"
+        style={{
+          display: 'none',
+          position: 'absolute',
+          left: '-9999px'
+        }}
+      >
+        {/* 인쇄 전용 스타일 */}
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            /* 모든 일반 콘텐츠 숨기기 */
+            body * {
+              visibility: hidden !important;
+            }
+            
+            /* 인쇄 콘텐츠만 표시 */
+            #exam-print-content,
+            #exam-print-content * {
+              visibility: visible !important;
+            }
+            
+            /* 페이지 설정 */
+            @page {
+              size: A4;
+              margin: 2cm;
+            }
+            
+            /* HTML, Body 설정 */
+            html, body {
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            
+            /* 인쇄 콘텐츠 배치 */
+            #exam-print-content {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              display: block !important;
+            }
+          }
+        `}} />
+
+        {/* 시험지 (문제지) */}
+        <h1 style={{
+          fontSize: '24px',
+          fontWeight: 'bold',
+          marginBottom: '32px',
+          color: '#000'
+        }}>
+          {title}
+        </h1>
+
+        <div style={{
+          display: 'flex',
+          gap: '4rem',
+          color: '#000'
+        }}>
+          {/* 좌측 컬럼 */}
+          <div style={{
+            flex: 1,
+            borderRight: '1px solid #d1d5db',
+            paddingRight: '2rem'
+          }}>
+            {leftColumn.map((word, index) => (
+              <div
+                key={word.id}
+                style={{
+                  marginBottom: '12px',
+                  lineHeight: '1.8',
+                  fontSize: '14px'
+                }}
+              >
+                {index + 1}. {word.word_text}
+              </div>
+            ))}
+          </div>
+
+          {/* 우측 컬럼 */}
+          <div style={{
+            flex: 1,
+            paddingLeft: '2rem'
+          }}>
+            {rightColumn.map((word, index) => (
+              <div
+                key={word.id}
+                style={{
+                  marginBottom: '12px',
+                  lineHeight: '1.8',
+                  fontSize: '14px'
+                }}
+              >
+                {leftColumn.length + index + 1}. {word.word_text}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const loadWords = async () => {
@@ -124,22 +252,25 @@ export function ExamPrintModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl">
-              {title} ({words.length}개)
-            </DialogTitle>
-            <Button 
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl">
+                {title} ({words.length}개)
+              </DialogTitle>
+              <Button 
+                onClick={handlePrint}
+                className="gap-2"
+                variant="outline"
+                disabled={loading || words.length === 0}
+              >
+                <Printer className="w-4 h-4" />
+                시험지 인쇄
+              </Button>
+            </div>
+          </DialogHeader>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -179,8 +310,12 @@ export function ExamPrintModal({
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* 인쇄 전용 콘텐츠 */}
+      {renderPrintContent()}
+    </>
   )
 }
 
