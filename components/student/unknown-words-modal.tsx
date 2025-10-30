@@ -70,7 +70,7 @@ export function UnknownWordsModal({
     <>
       {/* 화면용 모달 */}
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto print:hidden">
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-xl">
@@ -112,8 +112,8 @@ export function UnknownWordsModal({
 
       {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
       {open && words.length > 0 && (
-        <div className="print-only">
-          <h1 className="print-title">
+        <div className="hidden print:block fixed top-0 left-0 w-full min-h-screen bg-white p-8">
+          <h1 className="text-2xl font-bold mb-8">
             {sessionNumber}회차 - 모르는 단어 ({unknownCount}개)
           </h1>
           
@@ -126,61 +126,6 @@ export function UnknownWordsModal({
           </div>
         </div>
       )}
-
-      {/* 스타일 */}
-      <style jsx global>{`
-        /* 화면에서 인쇄 레이아웃 숨김 */
-        @media screen {
-          .print-only {
-            display: none;
-          }
-        }
-        
-        @media print {
-          /* 모달 완전 숨김 */
-          [role="dialog"],
-          [data-radix-dialog-overlay],
-          [data-radix-dialog-content] {
-            display: none !important;
-          }
-          
-          /* 인쇄 레이아웃만 표시 */
-          .print-only {
-            display: block !important;
-          }
-          
-          /* 페이지 설정 */
-          @page {
-            size: A4;
-            margin: 2cm;
-          }
-          
-          /* 제목 */
-          .print-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 32px;
-          }
-          
-          /* 2단 컬럼 (좌측 우선) */
-          .print-columns {
-            columns: 2;
-            column-gap: 4rem;
-            column-rule: 1px solid #d1d5db;
-            column-fill: auto;
-            min-height: 10rem;
-          }
-          
-          /* 단어 항목 */
-          .print-word {
-            break-inside: avoid;
-            page-break-inside: avoid;
-            margin-bottom: 12px;
-            line-height: 1.8;
-            font-size: 14px;
-          }
-        }
-      `}</style>
     </>
   )
 }

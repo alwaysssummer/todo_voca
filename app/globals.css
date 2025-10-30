@@ -58,3 +58,34 @@
   }
 }
 
+/* 인쇄 스타일 */
+@media print {
+  /* 페이지 설정 */
+  @page {
+    size: A4;
+    margin: 2cm;
+  }
+  
+  /* 모달 숨김 */
+  [data-radix-dialog-overlay],
+  [data-radix-dialog-content] {
+    display: none !important;
+  }
+  
+  /* 인쇄 레이아웃 */
+  .print-columns {
+    columns: 2 !important;
+    column-gap: 4rem !important;
+    column-rule: 1px solid #d1d5db !important;
+    column-fill: auto !important;
+    min-height: 10rem !important;
+  }
+  
+  .print-word {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12px !important;
+    line-height: 1.8 !important;
+  }
+}
+
