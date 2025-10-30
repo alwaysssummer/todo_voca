@@ -112,12 +112,19 @@ export function UnknownWordsModal({
               top: 0 !important;
               width: 100% !important;
               display: block !important;
+              page-break-after: avoid !important;
             }
             
             /* 페이지 설정 */
             @page {
               size: A4;
               margin: 2cm;
+            }
+            
+            /* body 높이 제한으로 2페이지 방지 */
+            body {
+              max-height: 297mm !important;
+              overflow: hidden !important;
             }
           }
         `}} />
