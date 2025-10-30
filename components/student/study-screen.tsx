@@ -304,19 +304,6 @@ export function StudyScreen({ token }: { token: string }) {
             <h2 className="text-lg font-semibold">{student.name}</h2>
             <Badge variant="outline">{progress.session}회차</Badge>
           </div>
-          {currentWordlist && (
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
-              <span className="font-medium">{currentWordlist.name}</span>
-              {currentAssignment && currentAssignment.filtered_word_ids && (
-                <Badge variant="outline" className="text-xs py-0">
-                  복습 {currentAssignment.filtered_word_ids.length}개
-                </Badge>
-              )}
-              <span className="text-muted-foreground/70">
-                · 전체 진행률: {progress.generationCompleted}/{progress.generationTotal} ({generationProgressPercentage.toFixed(0)}%)
-              </span>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
