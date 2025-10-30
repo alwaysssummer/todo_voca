@@ -293,6 +293,16 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                     size="sm"
                     className="gap-2"
                     disabled={selectedSessionsForExam.length === 0}
+                    onClick={() => handleVocabularyPrint('known')}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    아는 단어장
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={selectedSessionsForExam.length === 0}
                     onClick={() => handleVocabularyPrint('unknown')}
                   >
                     <BookOpen className="w-4 h-4" />
