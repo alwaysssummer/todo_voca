@@ -325,16 +325,12 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                               onCheckedChange={() => toggleSessionSelection(session.id)}
                             />
                             
-                            <div>
-                              <div className="font-semibold text-base">
-                                {String(session.session_number).padStart(2, '0')}
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {new Date(session.completed_date).toLocaleDateString('ko-KR', { 
-                                  month: 'long', 
-                                  day: 'numeric'
-                                })}
-                              </div>
+                            <div className="font-semibold text-base flex items-center gap-2">
+                              <span>{String(session.session_number).padStart(2, '0')}</span>
+                              <span className="text-muted-foreground">·</span>
+                              <span className="text-xs text-muted-foreground font-normal">
+                                {(new Date(session.completed_date).getMonth() + 1)}/{new Date(session.completed_date).getDate()}
+                              </span>
                             </div>
                           </div>
 
