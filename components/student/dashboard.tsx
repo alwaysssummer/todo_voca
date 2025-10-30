@@ -352,7 +352,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 }}
                               >
                                 <CheckCircle2 className="w-4 h-4" />
-                                {knownCount}
+                                {String(knownCount).padStart(2, ' ')}
                               </Button>
                               
                               {/* O-TEST 평가 상태 */}
@@ -362,7 +362,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                   <div className="flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
                                     <span className="text-sm font-medium text-green-700 whitespace-nowrap">
-                                      {session.o_test_correct}/{session.o_test_total}
+                                      {String(session.o_test_correct).padStart(2, ' ')}/{String(session.o_test_total).padStart(2, ' ')}
                                     </span>
                                   </div>
                                 ) : (
@@ -375,7 +375,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                       aria-label="O-TEST 평가 시작하기"
                                     />
                                     <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
-                                      0/0
+                                      {String(0).padStart(2, ' ')}/{String(0).padStart(2, ' ')}
                                     </span>
                                   </div>
                                 )}
@@ -401,7 +401,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 disabled={unknownCount === 0}
                               >
                                 <XCircle className="w-4 h-4" />
-                                {unknownCount}
+                                {String(unknownCount).padStart(2, ' ')}
                               </Button>
                               
                               {/* X-TEST 평가 상태 */}
@@ -411,7 +411,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                   <div className="flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
                                     <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
-                                      0/0
+                                      {String(0).padStart(2, ' ')}/{String(0).padStart(2, ' ')}
                                     </span>
                                   </div>
                                 ) : session.x_test_completed ? (
@@ -419,7 +419,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                   <div className="flex items-center gap-1.5">
                                     <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
                                     <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
-                                      {session.x_test_correct}/{session.x_test_total}
+                                      {String(session.x_test_correct).padStart(2, ' ')}/{String(session.x_test_total).padStart(2, ' ')}
                                     </span>
                                   </div>
                                 ) : (
@@ -432,7 +432,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                       aria-label="X-TEST 평가 시작하기"
                                     />
                                     <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
-                                      0/0
+                                      {String(0).padStart(2, ' ')}/{String(0).padStart(2, ' ')}
                                     </span>
                                   </div>
                                 )}
