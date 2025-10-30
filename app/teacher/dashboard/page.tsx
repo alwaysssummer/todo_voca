@@ -14,7 +14,10 @@ import {
   Eye,
   Trash2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Edit2,
+  Check,
+  X
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
@@ -69,6 +72,8 @@ export default function TeacherDashboard() {
   const [selectedStudentName, setSelectedStudentName] = useState('')
   const [selectedWordlist, setSelectedWordlist] = useState<Wordlist | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [editingWordlistId, setEditingWordlistId] = useState<string | null>(null)
+  const [editingWordlistName, setEditingWordlistName] = useState('')
 
   useEffect(() => {
     // 로그인 확인
@@ -369,6 +374,45 @@ export default function TeacherDashboard() {
     }
   }
 
+  const handleEditWordlistName = (wordlistId: string, currentName: string) => {
+    setEditingWordlistId(wordlistId)
+    setEditingWordlistName(currentName)
+  }
+
+  const handleSaveWordlistName = async () => {
+    if (!editingWordlistId || !editingWordlistName.trim()) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('wordlists')
+        .update({ name: editingWordlistName.trim() })
+        .eq('id', editingWordlistId)
+
+      if (error) throw error
+
+      // 로컬 상태 업데이트
+      setWordlists(wordlists.map(w => 
+        w.id === editingWordlistId 
+          ? { ...w, title: editingWordlistName.trim() }
+          : w
+      ))
+
+      // 편집 모드 종료
+      setEditingWordlistId(null)
+      setEditingWordlistName('')
+    } catch (err: any) {
+      console.error('단어장 이름 변경 실패:', err)
+      alert(err.message || '단어장 이름 변경 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingWordlistId(null)
+    setEditingWordlistName('')
+  }
+
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -612,7 +656,55 @@ export default function TeacherDashboard() {
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-center gap-4 flex-1">
-                      <h3 className="font-semibold">{wordlist.title}</h3>
+                      {/* 단어장 이름 - 편집 모드 */}
+                      {editingWordlistId === wordlist.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editingWordlistName}
+                            onChange={(e) => setEditingWordlistName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveWordlistName()
+                              } else if (e.key === 'Escape') {
+                                handleCancelEdit()
+                              }
+                            }}
+                            className="h-8 w-64"
+                            autoFocus
+                            onBlur={handleSaveWordlistName}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={handleSaveWordlistName}
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                            onClick={handleCancelEdit}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <h3 className="font-semibold">{wordlist.title}</h3>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleEditWordlistName(wordlist.id, wordlist.title)}
+                            title="이름 변경"
+                          >
+                            <Edit2 className="w-3 h-3 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center gap-3 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <BookOpen className="w-3 h-3" />
