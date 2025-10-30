@@ -24,6 +24,7 @@ import { KnownWordsModal } from '@/components/student/known-words-modal'
 import { ExamPrintModal } from '@/components/student/exam-print-modal'
 import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
 import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
+import { TestResultModal } from '@/components/student/test-result-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -64,6 +65,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   // 전체 단어장 출력 모달 state
   const [wholeVocabModalOpen, setWholeVocabModalOpen] = useState(false)
+
+  // 테스트 결과 모달 state
+  const [testResultModalOpen, setTestResultModalOpen] = useState(false)
+  const [testResultModalData, setTestResultModalData] = useState<{
+    sessionNumber: number
+    testType: 'known' | 'unknown'
+    wrongWordIds: string[] | null
+  } | null>(null)
 
   // 체크박스 토글 함수
   const toggleSessionSelection = (sessionId: string) => {
@@ -108,6 +117,20 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     console.log('currentAssignment:', currentAssignment)
     console.log('wordlist_id:', currentAssignment?.wordlist_id)
     setWholeVocabModalOpen(true)
+  }
+
+  // 테스트 결과 보기 핸들러
+  const handleViewTestResult = (
+    sessionNumber: number, 
+    testType: 'known' | 'unknown',
+    wrongWordIds: string[] | null
+  ) => {
+    setTestResultModalData({
+      sessionNumber,
+      testType,
+      wrongWordIds
+    })
+    setTestResultModalOpen(true)
   }
 
   if (loading) {
@@ -352,8 +375,16 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                               {/* O-TEST 평가 상태 */}
                               <div className="min-w-[4.5rem] flex items-center justify-center">
                                 {session.o_test_completed ? (
-                                  // 평가 완료: 점수 표시
-                                  <div className="flex items-center gap-1.5">
+                                  // 평가 완료: 점수 표시 (클릭 가능)
+                                  <div 
+                                    className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => handleViewTestResult(
+                                      session.session_number,
+                                      'known',
+                                      session.o_test_wrong_word_ids
+                                    )}
+                                    title="테스트 결과 보기"
+                                  >
                                     <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
                                     <span className="text-sm font-medium text-green-700 whitespace-nowrap">
                                       {String(session.o_test_correct).padStart(2, ' ')}/{String(session.o_test_total).padStart(2, ' ')}
@@ -409,8 +440,16 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                     </span>
                                   </div>
                                 ) : session.x_test_completed ? (
-                                  // 평가 완료: 점수 표시
-                                  <div className="flex items-center gap-1.5">
+                                  // 평가 완료: 점수 표시 (클릭 가능)
+                                  <div 
+                                    className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => handleViewTestResult(
+                                      session.session_number,
+                                      'unknown',
+                                      session.x_test_wrong_word_ids
+                                    )}
+                                    title="테스트 결과 보기"
+                                  >
                                     <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
                                     <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
                                       {String(session.x_test_correct).padStart(2, ' ')}/{String(session.x_test_total).padStart(2, ' ')}
@@ -497,6 +536,20 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
           onClose={() => setWholeVocabModalOpen(false)}
           wordlistId={currentAssignment.wordlist_id}
           title={`전체 단어장 (${currentAssignment.total_words}개)`}
+        />
+      )}
+
+      {/* 테스트 결과 모달 */}
+      {testResultModalData && (
+        <TestResultModal
+          open={testResultModalOpen}
+          onClose={() => {
+            setTestResultModalOpen(false)
+            setTestResultModalData(null)
+          }}
+          sessionNumber={testResultModalData.sessionNumber}
+          testType={testResultModalData.testType}
+          wrongWordIds={testResultModalData.wrongWordIds}
         />
       )}
     </div>

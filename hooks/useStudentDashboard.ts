@@ -30,10 +30,12 @@ interface DashboardData {
     o_test_completed: boolean
     o_test_correct: number | null
     o_test_total: number | null
+    o_test_wrong_word_ids: string[] | null
     // X-TEST (모르는 단어 평가)
     x_test_completed: boolean
     x_test_correct: number | null
     x_test_total: number | null
+    x_test_wrong_word_ids: string[] | null
   }>
 }
 
@@ -104,7 +106,8 @@ export function useStudentDashboard(token: string) {
               test_type,
               correct_count,
               total_questions,
-              score
+              score,
+              wrong_word_ids
             )
           `)
           .eq('student_id', student.id)
@@ -131,10 +134,12 @@ export function useStudentDashboard(token: string) {
             o_test_completed: !!oTest,
             o_test_correct: oTest?.correct_count || null,
             o_test_total: oTest?.total_questions || null,
+            o_test_wrong_word_ids: oTest?.wrong_word_ids || null,
             // X-TEST (모르는 단어 평가)
             x_test_completed: !!xTest,
             x_test_correct: xTest?.correct_count || null,
-            x_test_total: xTest?.total_questions || null
+            x_test_total: xTest?.total_questions || null,
+            x_test_wrong_word_ids: xTest?.wrong_word_ids || null
           }
         })
 
