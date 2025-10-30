@@ -163,11 +163,6 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const completedSessionsCount = completedSessions.length
   const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
   const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
-  const todayProgress = currentAssignment.completed_words % student.session_goal
-  
-  // O-TEST, X-TEST 완료 통계 (향후 구현)
-  const oTestCompleted = 0  // TODO: online_tests 테이블에서 조회
-  const xTestCompleted = 0  // TODO: online_tests 테이블에서 조회
   
   const isGenerationCompleted = currentAssignment.completed_words >= currentAssignment.total_words
 
@@ -194,64 +189,11 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  학습 회차
-                </CardTitle>
-                <Calendar className="w-4 h-4 text-blue-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{completedSessionsCount}/{totalSessions}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Sessions Completed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  평가 완료
-                </CardTitle>
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{oTestCompleted}/{completedSessionsCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                O-TEST Completed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  추가 학습
-                </CardTitle>
-                <XCircle className="w-4 h-4 text-orange-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{xTestCompleted}/{completedSessionsCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                X-TEST Completed
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* 학습 버튼 */}
         <Button 
           size="lg" 
-          className="w-full h-14 text-lg mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          className="w-full h-14 mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
           onClick={() => router.push(`/s/${token}`)}
           disabled={isGenerationCompleted}
         >
@@ -261,10 +203,21 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               학습 완료
             </>
           ) : (
-            <>
-              <Play className="mr-2 h-5 w-5" />
-              학습 하기 {currentSession}/{totalSessions}회차
-            </>
+            <div className="flex items-center gap-4 w-full">
+              <Play className="h-5 w-5 flex-shrink-0" />
+              <span className="text-lg font-semibold">{currentSession}/{totalSessions}</span>
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-white rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-sm font-medium min-w-[3rem] text-right">
+                  {Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%
+                </span>
+              </div>
+            </div>
           )}
         </Button>
 
