@@ -45,10 +45,11 @@ export function TestResultModal({
       try {
         setLoading(true)
 
+        // wrongWordIds는 이미 상단에서 null 체크됨
         const { data, error } = await supabase
           .from('words')
           .select('id, word_text, meaning')
-          .in('id', wrongWordIds)
+          .in('id', wrongWordIds!)  // non-null assertion
 
         if (error) throw error
 
