@@ -116,21 +116,47 @@ export function UnknownWordsModal({
               margin: 2cm; 
             }
             
-            /* 모달 오버레이 숨김 */
-            [data-radix-dialog-overlay] {
+            /* body 스타일 초기화 */
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            
+            /* 모달 오버레이 완전 제거 */
+            [data-radix-dialog-overlay],
+            [data-radix-portal] > div:first-child {
               display: none !important;
             }
             
-            /* 모달 컨테이너 스타일 초기화 */
+            /* Portal 컨테이너 */
+            [data-radix-portal] {
+              position: static !important;
+            }
+            
+            /* 모달 컨테이너를 전체 페이지로 */
             [data-radix-dialog-content] {
               position: static !important;
               transform: none !important;
+              width: 100% !important;
               max-width: 100% !important;
-              max-height: 100% !important;
+              height: auto !important;
+              max-height: none !important;
               box-shadow: none !important;
               border: none !important;
-              padding: 1rem !important;
+              border-radius: 0 !important;
+              padding: 0 !important;
               margin: 0 !important;
+            }
+            
+            /* DialogHeader 여백 조정 */
+            [data-radix-dialog-content] > div:first-child {
+              padding-bottom: 1.5rem !important;
+            }
+            
+            /* 제목 스타일 */
+            h2[data-radix-dialog-title] {
+              font-size: 1.5rem !important;
+              margin-bottom: 0.5rem !important;
             }
             
             /* 닫기 버튼 및 인쇄 버튼 숨김 */
@@ -139,15 +165,22 @@ export function UnknownWordsModal({
               display: none !important;
             }
             
-            /* 단어 항목이 페이지 나눔 방지 */
+            /* 컬럼 레이아웃 최적화 */
+            .columns-2 {
+              column-gap: 4rem !important;
+              column-rule: 1px solid #d1d5db !important;
+            }
+            
+            /* 단어 항목 스타일 */
             .break-inside-avoid {
               break-inside: avoid;
               page-break-inside: avoid;
+              margin-bottom: 0.5rem !important;
             }
             
-            /* 컬럼 간격 조정 */
-            .columns-2 {
-              column-gap: 3rem;
+            /* 단어 간격 조정 */
+            .columns-1, .columns-2 {
+              line-height: 1.8 !important;
             }
           }
         `}</style>
