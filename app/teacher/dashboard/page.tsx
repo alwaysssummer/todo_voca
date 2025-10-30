@@ -509,59 +509,63 @@ export default function TeacherDashboard() {
                     key={student.id} 
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                   >
-                    <div className="flex items-center gap-3 flex-1">
+                    {/* 좌측: 학생 기본 정보 */}
+                    <div className="flex items-center gap-3">
                       <h3 className="font-semibold">{student.name}</h3>
-                      
-                      {/* 학습 진행 */}
-                      <Badge variant="outline" className="gap-1">
-                        <BookOpen className="w-3 h-3" />
-                        {student.completedSessions}/{student.totalSessions}
-                      </Badge>
-                      
-                      {/* O-TEST 진행 */}
-                      <Badge variant="outline" className="gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        O: {student.oTestCompleted}/{student.completedSessions}
-                      </Badge>
-                      
-                      {/* X-TEST 진행 */}
-                      <Badge variant="outline" className="gap-1">
-                        <XCircle className="w-3 h-3" />
-                        X: {student.xTestCompleted}/{student.completedSessions}
-                      </Badge>
-                      
-                      <span className="text-sm text-muted-foreground">•</span>
                       <span className="text-sm text-muted-foreground">{student.email}</span>
-                      <span className="text-sm text-muted-foreground">•</span>
-                      <span className="text-sm font-medium">{student.progress}%</span>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openAssignDialog(student.id, student.name)}
-                        className="gap-2"
-                      >
-                        <BookOpen className="w-3 h-3" />
-                        단어장
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openStudentDashboard(student.accessToken)}
-                        className="gap-2"
-                      >
-                        <Eye className="w-3 h-3" />
-                        보기
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteStudent(student.id, student.name)}
-                        className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+
+                    {/* 우측: 진행 상황 + 버튼 */}
+                    <div className="flex items-center gap-3">
+                      {/* 학습 진행 통계 */}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          {student.completedSessions}/{student.totalSessions}
+                        </Badge>
+                        
+                        <Badge variant="outline" className="gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          O: {student.oTestCompleted}/{student.completedSessions}
+                        </Badge>
+                        
+                        <Badge variant="outline" className="gap-1">
+                          <XCircle className="w-3 h-3" />
+                          X: {student.xTestCompleted}/{student.completedSessions}
+                        </Badge>
+                        
+                        <span className="text-sm font-medium">{student.progress}%</span>
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openAssignDialog(student.id, student.name)}
+                          className="gap-2"
+                        >
+                          <BookOpen className="w-3 h-3" />
+                          단어장
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openStudentDashboard(student.accessToken)}
+                          className="gap-2"
+                        >
+                          <Eye className="w-3 h-3" />
+                          보기
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteStudent(student.id, student.name)}
+                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
