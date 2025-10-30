@@ -327,15 +327,7 @@ export function StudyScreen({ token }: { token: string }) {
       {/* 완료 목록 */}
       <section className="h-2/3 border-t bg-muted/10">
         <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">
-              오늘 완료한 단어
-            </p>
-            <Badge variant="secondary" className="text-sm">
-              {completedWords.length}개
-            </Badge>
-          </div>
-          <ScrollArea className="h-[calc(66vh-8rem)]">
+          <ScrollArea className="h-[calc(66vh-4rem)]">
             <div className="space-y-2">
               {completedWords.length === 0 ? (
                 <Card className="p-8 text-center">
