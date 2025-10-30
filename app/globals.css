@@ -58,6 +58,11 @@
   }
 }
 
+/* 인쇄 전용 레이아웃 */
+.screen-only {
+  display: none;
+}
+
 /* 인쇄 스타일 */
 @media print {
   /* 페이지 설정 */
@@ -70,6 +75,11 @@
   [data-radix-dialog-overlay],
   [data-radix-dialog-content] {
     display: none !important;
+  }
+  
+  /* 인쇄 레이아웃 표시 */
+  .screen-only {
+    display: block !important;
   }
   
   /* 인쇄 레이아웃 */
