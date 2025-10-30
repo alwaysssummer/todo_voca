@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Trophy, CheckCircle, XCircle, Home } from 'lucide-react'
+import { Trophy, Home } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface TestResult {
@@ -51,16 +51,13 @@ export function TestResultScreen({ result, studentToken }: TestResultScreenProps
           <CardTitle className="text-3xl font-bold">평가 완료!</CardTitle>
 
           {/* 결과 요약 */}
-          <div className="flex justify-center items-center gap-2 text-lg">
-            <span className="flex items-center gap-1 text-green-600 font-semibold">
-              <CheckCircle className="w-5 h-5" />
+          <div className="flex justify-center gap-3">
+            <Badge variant="secondary" className="text-base px-4 py-2">
               정답 {result.correctCount}
-            </span>
-            <span className="text-gray-400">/</span>
-            <span className="flex items-center gap-1 text-red-600 font-semibold">
-              <XCircle className="w-5 h-5" />
+            </Badge>
+            <Badge variant="secondary" className="text-base px-4 py-2">
               오답 {result.wrongWords.length}
-            </span>
+            </Badge>
           </div>
 
           {/* 대시보드로 버튼 */}
