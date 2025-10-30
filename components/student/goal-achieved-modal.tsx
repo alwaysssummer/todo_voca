@@ -18,6 +18,7 @@ interface GoalAchievedModalProps {
   dayNumber: number
   completedWordlistId: string
   studentToken: string
+  totalSessions?: number
 }
 
 export function GoalAchievedModal({ 
@@ -27,7 +28,8 @@ export function GoalAchievedModal({
   goal,
   dayNumber,
   completedWordlistId,
-  studentToken
+  studentToken,
+  totalSessions
 }: GoalAchievedModalProps) {
   const router = useRouter()
 
@@ -38,7 +40,7 @@ export function GoalAchievedModal({
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
-        className="sm:max-w-[400px]"
+        className="sm:max-w-[400px] [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
@@ -56,18 +58,12 @@ export function GoalAchievedModal({
           {/* 제목 */}
           <div className="space-y-2">
             <DialogTitle className="text-3xl font-bold">목표 달성!</DialogTitle>
-            <p className="text-muted-foreground">
-              오늘 {completedCount}개 단어를 완료했어요
-            </p>
           </div>
 
           {/* 통계 */}
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center">
             <Badge variant="secondary" className="text-lg px-4 py-2">
-              {dayNumber}회차
-            </Badge>
-            <Badge variant="outline" className="text-lg px-4 py-2">
-              {completedCount}/{goal}
+              {dayNumber}회차{totalSessions ? `/${totalSessions}` : ''}
             </Badge>
           </div>
 

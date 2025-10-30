@@ -392,7 +392,7 @@ export function StudyScreen({ token }: { token: string }) {
       )}
 
       {/* 목표 달성 축하 모달 */}
-      {completedWordlistData && (
+      {completedWordlistData && student && (
         <GoalAchievedModal
           open={goalModalOpen}
           onClose={handleGoalModalClose}
@@ -401,6 +401,7 @@ export function StudyScreen({ token }: { token: string }) {
           dayNumber={completedWordlistData?.sessionNumber || progress.session}
           completedWordlistId={completedWordlistData?.completedWordlistId || ''}
           studentToken={token}
+          totalSessions={student.session_goal > 0 ? Math.ceil(progress.generationTotal / student.session_goal) : undefined}
         />
       )}
 
