@@ -112,7 +112,7 @@ export function UnknownWordsModal({
 
       {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
       {open && words.length > 0 && (
-        <div className="screen-only fixed top-0 left-0 w-full min-h-screen bg-white p-8">
+        <div className="screen-only">
           <h1 className="text-2xl font-bold mb-8">
             {sessionNumber}회차 - 모르는 단어 ({unknownCount}개)
           </h1>
