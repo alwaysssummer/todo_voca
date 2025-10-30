@@ -59,10 +59,10 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const { student, currentAssignment, completedSessions } = data
   
   // ⭐ 통계 계산
-  const currentSession = currentAssignment.completed_words === 0 ? 1 : Math.ceil(currentAssignment.completed_words / student.session_goal)
+  const completedSessionsCount = completedSessions.length
+  const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
   const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
   const todayProgress = currentAssignment.completed_words % student.session_goal
-  const completedSessionsCount = completedSessions.length
   
   // O-TEST, X-TEST 완료 통계 (향후 구현)
   const oTestCompleted = 0  // TODO: online_tests 테이블에서 조회
