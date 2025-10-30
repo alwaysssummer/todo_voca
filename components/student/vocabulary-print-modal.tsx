@@ -138,7 +138,7 @@ export function VocabularyPrintModal({
                     fontSize: '14px'
                   }}
                 >
-                  {index + 1}. {word.word_text} : {word.meaning}
+                  ☐ {word.word_text} : {word.meaning}
                 </div>
               ))}
             </div>
@@ -157,7 +157,7 @@ export function VocabularyPrintModal({
                     fontSize: '14px'
                   }}
                 >
-                  {leftColumn.length + index + 1}. {word.word_text} : {word.meaning}
+                  ☐ {word.word_text} : {word.meaning}
                 </div>
               ))}
             </div>
@@ -282,7 +282,7 @@ export function VocabularyPrintModal({
             <div className="columns-1 md:columns-2 gap-8 py-4">
               {words.map((word, index) => (
                 <div key={word.id} className="flex gap-2 text-base mb-3 break-inside-avoid">
-                  <span className="font-semibold text-muted-foreground">{index + 1}.</span>
+                  <span className="font-semibold text-muted-foreground">☐</span>
                   <span className="font-medium">{word.word_text}</span>
                   <span className="text-muted-foreground">:</span>
                   <span className="text-muted-foreground">{word.meaning}</span>
