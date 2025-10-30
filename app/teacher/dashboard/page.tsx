@@ -553,7 +553,19 @@ export default function TeacherDashboard() {
                           className="gap-2"
                         >
                           <Eye className="w-3 h-3" />
-                          보기
+                          DESK
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
+                            window.open(link, '_blank')
+                          }}
+                          className="gap-2"
+                        >
+                          <Eye className="w-3 h-3" />
+                          MOBILE
                         </Button>
                         <Button
                           size="sm"
@@ -624,7 +636,7 @@ export default function TeacherDashboard() {
                         }}
                       >
                         <Eye className="w-3 h-3" />
-                        보기
+                        DESK
                       </Button>
                       <Button
                         size="sm"
