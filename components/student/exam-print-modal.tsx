@@ -116,16 +116,21 @@ export function ExamPrintModal({
               display: block !important;
             }
             
-            /* 답지 섹션: 홀수 페이지부터 시작 */
+            /* 시험지: 항상 페이지 끝에서 끊기 */
+            .exam-section {
+              page-break-after: always !important;
+            }
+            
+            /* 답지: 새 페이지에서 시작 */
             .answer-section {
               page-break-before: always !important;
             }
             
-            /* 시험지가 짝수 페이지로 끝나면 빈 페이지 추가되어 답지가 홀수 페이지에서 시작 */
-            @supports (break-after: left) {
-              .exam-section {
-                break-after: left;
-              }
+            /* 페이지 구분자: 빈 페이지 강제 */
+            .page-break-spacer {
+              page-break-after: always !important;
+              visibility: hidden !important;
+              height: 1px !important;
             }
           }
         `}} />
@@ -186,6 +191,9 @@ export function ExamPrintModal({
             </div>
           </div>
         </div>
+
+        {/* 빈 페이지 구분자: 시험지 끝 후 강제 페이지 분할 */}
+        <div className="page-break-spacer"></div>
 
         {/* 답지 (정답지) - 영어 + 한글 뜻 */}
         <div className="answer-section" style={{ marginTop: '64px' }}>
