@@ -22,6 +22,7 @@ import {
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
 import { ExamPrintModal } from '@/components/student/exam-print-modal'
+import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -55,6 +56,11 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const [examModalType, setExamModalType] = useState<'known' | 'unknown'>('known')
   const [examModalTitle, setExamModalTitle] = useState('')
 
+  // 단어장 출력 모달 state
+  const [vocabModalOpen, setVocabModalOpen] = useState(false)
+  const [vocabModalType, setVocabModalType] = useState<'known' | 'unknown'>('unknown')
+  const [vocabModalTitle, setVocabModalTitle] = useState('')
+
   // 체크박스 토글 함수
   const toggleSessionSelection = (sessionId: string) => {
     setSelectedSessionsForExam(prev => 
@@ -76,6 +82,20 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     setExamModalType(type)
     setExamModalTitle(title)
     setExamModalOpen(true)
+  }
+
+  // 단어장 출력 핸들러
+  const handleVocabularyPrint = (type: 'known' | 'unknown') => {
+    console.log(`${type === 'known' ? '아는' : '모르는'} 단어장 출력`)
+    console.log('선택된 회차:', selectedSessionsForExam)
+    
+    const title = type === 'known'
+      ? `아는 단어장 (${selectedSessionsForExam.length}개 회차)`
+      : `모르는 단어장 (${selectedSessionsForExam.length}개 회차)`
+    
+    setVocabModalType(type)
+    setVocabModalTitle(title)
+    setVocabModalOpen(true)
   }
 
   if (loading) {
@@ -268,6 +288,16 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                     <Printer className="w-4 h-4" />
                     모르는 단어 시험지
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={selectedSessionsForExam.length === 0}
+                    onClick={() => handleVocabularyPrint('unknown')}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    모르는 단어장
+                  </Button>
                 </div>
               )}
             </div>
@@ -436,6 +466,15 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         sessionIds={selectedSessionsForExam}
         type={examModalType}
         title={examModalTitle}
+      />
+
+      {/* 단어장 출력 모달 */}
+      <VocabularyPrintModal
+        open={vocabModalOpen}
+        onClose={() => setVocabModalOpen(false)}
+        sessionIds={selectedSessionsForExam}
+        type={vocabModalType}
+        title={vocabModalTitle}
       />
     </div>
   )
