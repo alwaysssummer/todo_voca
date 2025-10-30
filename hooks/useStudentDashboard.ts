@@ -11,6 +11,7 @@ interface DashboardData {
   }
   currentAssignment: {
     generation: number
+    wordlist_id: string
     wordlist_name: string
     total_words: number
     completed_words: number
@@ -123,6 +124,7 @@ export function useStudentDashboard(token: string) {
           },
           currentAssignment: {
             generation: assignment.generation,
+            wordlist_id: assignment.wordlist_id,
             wordlist_name: wordlistData?.name || 'Unknown',
             total_words: wordlistData?.total_words || 0,
             completed_words: completedCount || 0,

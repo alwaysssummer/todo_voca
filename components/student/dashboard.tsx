@@ -23,6 +23,7 @@ import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
 import { ExamPrintModal } from '@/components/student/exam-print-modal'
 import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
+import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -60,6 +61,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const [vocabModalOpen, setVocabModalOpen] = useState(false)
   const [vocabModalType, setVocabModalType] = useState<'known' | 'unknown'>('unknown')
   const [vocabModalTitle, setVocabModalTitle] = useState('')
+
+  // 전체 단어장 출력 모달 state
+  const [wholeVocabModalOpen, setWholeVocabModalOpen] = useState(false)
 
   // 체크박스 토글 함수
   const toggleSessionSelection = (sessionId: string) => {
@@ -101,8 +105,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   // 전체 단어장 출력 핸들러
   const handleWholeVocabularyPrint = () => {
     console.log('전체 단어장 출력')
-    setVocabModalTitle(`전체 단어장 (${currentAssignment.total_words}개)`)
-    setVocabModalOpen(true)
+    console.log('currentAssignment:', currentAssignment)
+    console.log('wordlist_id:', currentAssignment?.wordlist_id)
+    setWholeVocabModalOpen(true)
   }
 
   if (loading) {
@@ -493,15 +498,24 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         title={examModalTitle}
       />
 
-      {/* 단어장 출력 모달 */}
+      {/* 단어장 출력 모달 (아는/모르는 단어장) */}
       <VocabularyPrintModal
         open={vocabModalOpen}
         onClose={() => setVocabModalOpen(false)}
         sessionIds={selectedSessionsForExam}
-        wordlistId={currentAssignment.wordlist_id}
         type={vocabModalType}
         title={vocabModalTitle}
       />
+
+      {/* 전체 단어장 출력 모달 */}
+      {currentAssignment && (
+        <WholeVocabularyPrintModal
+          open={wholeVocabModalOpen}
+          onClose={() => setWholeVocabModalOpen(false)}
+          wordlistId={currentAssignment.wordlist_id}
+          title={`전체 단어장 (${currentAssignment.total_words}개)`}
+        />
+      )}
     </div>
   )
 }
