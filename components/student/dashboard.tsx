@@ -64,6 +64,22 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     )
   }
 
+  // 전체 선택/해제 토글
+  const toggleSelectAll = () => {
+    if (selectedSessionsForExam.length === completedSessions.length) {
+      // 전체 선택 상태 → 전체 해제
+      setSelectedSessionsForExam([])
+    } else {
+      // 일부 또는 없음 → 전체 선택
+      const allSessionIds = completedSessions.map(session => session.id)
+      setSelectedSessionsForExam(allSessionIds)
+    }
+  }
+
+  // 전체 선택 여부 계산
+  const isAllSelected = completedSessions.length > 0 && 
+                        selectedSessionsForExam.length === completedSessions.length
+
   // 시험지 출력 핸들러
   const handleExamPrint = (type: 'known' | 'unknown') => {
     console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
@@ -265,6 +281,21 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               </div>
             ) : (
               <div className="space-y-3">
+                {/* 전체 선택 체크박스 */}
+                <div className="flex items-center gap-2 pb-3 border-b">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    전체 선택
+                    <span className="ml-1 text-blue-600 font-semibold">
+                      ({selectedSessionsForExam.length}/{completedSessions.length})
+                    </span>
+                  </span>
+                </div>
+
+                {/* 회차 목록 */}
                 {completedSessions.map((session) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
