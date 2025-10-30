@@ -297,30 +297,6 @@ export function StudyScreen({ token }: { token: string }) {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* 헤더 */}
-      <header className="min-h-24 border-b px-6 py-4 flex items-center justify-between bg-background sticky top-0 z-10 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">{student.name}</h2>
-            <Badge variant="outline">{progress.session}회차</Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-xs text-muted-foreground mb-1">오늘 목표</div>
-            <div className="text-2xl font-bold">
-              {progress.today}
-              <span className="text-muted-foreground text-base font-normal">
-                /{progress.todayGoal}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {progressPercentage.toFixed(0)}% 완료
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* 현재 단어 */}
       <section className="h-1/3 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center space-y-2">
