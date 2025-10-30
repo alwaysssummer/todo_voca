@@ -361,15 +361,32 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                 <CheckCircle2 className="w-4 h-4" />
                                 {knownCount}
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1"
-                                onClick={() => router.push(`/s/${token}/test/${session.id}?type=known`)}
-                              >
-                                <Award className="w-3 h-3" />
-                                평가
-                              </Button>
+                              
+                              {/* O-TEST 평가 상태 */}
+                              <div className="min-w-[4.5rem] flex items-center justify-center">
+                                {session.o_test_completed ? (
+                                  // 평가 완료: 점수 표시
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-green-700 whitespace-nowrap">
+                                      {session.o_test_correct}/{session.o_test_total}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  // 평가 전: 회색 원 버튼 + 투명 텍스트로 공간 확보
+                                  <div className="relative flex items-center justify-center">
+                                    <button
+                                      className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                                      onClick={() => router.push(`/s/${token}/test/${session.id}?type=known`)}
+                                      title="O-TEST 평가 시작"
+                                      aria-label="O-TEST 평가 시작하기"
+                                    />
+                                    <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
+                                      0/0
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                             
                             {/* X-TEST */}
@@ -391,15 +408,32 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                                   <XCircle className="w-4 h-4" />
                                   {unknownCount}
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="gap-1"
-                                  onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
-                                >
-                                  <Award className="w-3 h-3" />
-                                  평가
-                                </Button>
+                                
+                                {/* X-TEST 평가 상태 */}
+                                <div className="min-w-[4.5rem] flex items-center justify-center">
+                                  {session.x_test_completed ? (
+                                    // 평가 완료: 점수 표시
+                                    <div className="flex items-center gap-1.5">
+                                      <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+                                      <span className="text-sm font-medium text-orange-700 whitespace-nowrap">
+                                        {session.x_test_correct}/{session.x_test_total}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    // 평가 전: 회색 원 버튼 + 투명 텍스트로 공간 확보
+                                    <div className="relative flex items-center justify-center">
+                                      <button
+                                        className="w-7 h-7 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center flex-shrink-0"
+                                        onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
+                                        title="X-TEST 평가 시작"
+                                        aria-label="X-TEST 평가 시작하기"
+                                      />
+                                      <span className="absolute text-transparent select-none pointer-events-none text-sm font-medium">
+                                        0/0
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>

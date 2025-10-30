@@ -26,6 +26,14 @@ interface DashboardData {
     completed_date: string
     test_completed: boolean
     test_score: number | null
+    // O-TEST (아는 단어 평가)
+    o_test_completed: boolean
+    o_test_correct: number | null
+    o_test_total: number | null
+    // X-TEST (모르는 단어 평가)
+    x_test_completed: boolean
+    x_test_correct: number | null
+    x_test_total: number | null
   }>
 }
 
@@ -93,6 +101,9 @@ export function useStudentDashboard(token: string) {
             completed_date,
             online_test_completed,
             online_tests (
+              test_type,
+              correct_count,
+              total_questions,
               score
             )
           `)
@@ -102,16 +113,30 @@ export function useStudentDashboard(token: string) {
         if (sessionsError) throw sessionsError
 
         // 완성된 회차 데이터 변환
-        const formattedSessions = (completedSessions || []).map(session => ({
-          id: session.id,
-          session_number: session.session_number,
-          generation: session.generation,
-          word_count: session.word_ids?.length || 0,
-          unknown_count: session.unknown_word_ids?.length || 0,
-          completed_date: session.completed_date,
-          test_completed: session.online_test_completed,
-          test_score: session.online_tests?.[0]?.score || null
-        }))
+        const formattedSessions = (completedSessions || []).map(session => {
+          // O-TEST, X-TEST 분리
+          const oTest = session.online_tests?.find((t: any) => t.test_type === 'known')
+          const xTest = session.online_tests?.find((t: any) => t.test_type === 'unknown')
+          
+          return {
+            id: session.id,
+            session_number: session.session_number,
+            generation: session.generation,
+            word_count: session.word_ids?.length || 0,
+            unknown_count: session.unknown_word_ids?.length || 0,
+            completed_date: session.completed_date,
+            test_completed: session.online_test_completed,
+            test_score: session.online_tests?.[0]?.score || null,
+            // O-TEST (아는 단어 평가)
+            o_test_completed: !!oTest,
+            o_test_correct: oTest?.correct_count || null,
+            o_test_total: oTest?.total_questions || null,
+            // X-TEST (모르는 단어 평가)
+            x_test_completed: !!xTest,
+            x_test_correct: xTest?.correct_count || null,
+            x_test_total: xTest?.total_questions || null
+          }
+        })
 
         // Supabase 관계형 데이터 안전하게 접근
         const wordlistData = (assignment as any).wordlists
