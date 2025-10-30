@@ -241,7 +241,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                       onCheckedChange={toggleSelectAll}
                     />
                     <span className="text-sm font-medium text-muted-foreground">
-                      전체 선택
+                      A
                       <span className="ml-1 text-blue-600 font-semibold">
                         ({selectedSessionsForExam.length}/{completedSessions.length})
                       </span>
