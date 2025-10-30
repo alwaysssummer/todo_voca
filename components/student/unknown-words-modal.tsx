@@ -113,7 +113,7 @@ export function UnknownWordsModal({
 
       {/* 인쇄 전용 레이아웃 (화면에서 숨김) */}
       {open && words.length > 0 && (
-        <div className="hidden print:block fixed inset-0 bg-white z-[9999]">
+        <div className="hidden print:block">
           <div className="print-page">
             {/* 제목 */}
             <h1 className="text-2xl font-bold mb-8">
@@ -124,6 +124,7 @@ export function UnknownWordsModal({
             <div className="word-columns">
               {words.map((word, index) => (
                 <div key={index} className="word-item">
+                  <span className="word-number">{index + 1}. </span>
                   <span className="word-text">{word.word_text}</span>
                   <span className="separator"> : </span>
                   <span className="word-meaning">{word.meaning}</span>
@@ -147,6 +148,7 @@ export function UnknownWordsModal({
                 height: 100%;
                 padding: 0;
                 margin: 0;
+                page-break-after: avoid;
               }
 
               /* 제목 스타일 */
@@ -161,9 +163,10 @@ export function UnknownWordsModal({
                 columns: 2;
                 column-gap: 4rem;
                 column-rule: 1px solid #d1d5db;
-                column-fill: auto;  /* ⭐ 좌측부터 채우고 우측 상단으로 */
+                column-fill: auto;
                 height: auto;
-                max-height: calc(297mm - 4cm - 80px);  /* A4 높이 - 여백 - 제목 */
+                max-height: calc(297mm - 4cm - 80px);
+                min-height: 10rem;
               }
 
               /* 단어 항목 */
@@ -172,6 +175,16 @@ export function UnknownWordsModal({
                 page-break-inside: avoid;
                 margin-bottom: 12px;
                 line-height: 1.8;
+                display: flex;
+                align-items: baseline;
+              }
+
+              /* 번호 스타일 */
+              .word-number {
+                font-weight: 600;
+                color: #6b7280;
+                margin-right: 4px;
+                flex-shrink: 0;
               }
 
               /* 단어 텍스트 */
@@ -182,6 +195,7 @@ export function UnknownWordsModal({
               /* 구분자 */
               .separator {
                 color: #6b7280;
+                flex-shrink: 0;
               }
 
               /* 뜻 */
