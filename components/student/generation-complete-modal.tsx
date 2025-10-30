@@ -9,24 +9,32 @@ import { Sparkles, ArrowRight, TrendingDown, Trophy } from 'lucide-react'
 interface GenerationCompleteModalProps {
   open: boolean
   onClose: () => void
-  currentGeneration: number
-  skippedCount: number
+  currentGeneration?: number  // ⭐ Optional로 변경 (세대 개념 제거)
+  totalWords: number  // ⭐ 전체 단어 수
+  skippedCount: number  // 모르는 단어 수
   nextGenerationCreated: boolean
   perfectCompletion: boolean
+  studentToken?: string  // ⭐ 대시보드 이동을 위한 토큰
 }
 
 export function GenerationCompleteModal({
   open,
   onClose,
   currentGeneration,
+  totalWords,
   skippedCount,
   nextGenerationCreated,
-  perfectCompletion
+  perfectCompletion,
+  studentToken
 }: GenerationCompleteModalProps) {
   
   const handleConfirm = () => {
-    // 페이지 새로고침으로 다음 세대 로드
-    window.location.reload()
+    // ⭐ 학생 대시보드로 이동
+    if (studentToken) {
+      window.location.href = `/s/${studentToken}/dashboard`
+    } else {
+      window.location.reload()  // Fallback
+    }
   }
 
   return (
@@ -42,7 +50,7 @@ export function GenerationCompleteModal({
             ) : (
               <>
                 <Sparkles className="h-6 w-6 text-purple-500" />
-                {currentGeneration}차 단어장 완료!
+                단어장 학습 완료!
               </>
             )}
           </DialogTitle>
@@ -71,49 +79,37 @@ export function GenerationCompleteModal({
               </div>
             </>
           ) : (
-            // 다음 세대 생성 케이스
+            // 복습 단어장 생성 케이스
             <>
               <div className="text-center space-y-2">
                 <div className="text-5xl">🎯</div>
                 <p className="text-base text-muted-foreground">
-                  {currentGeneration}차 단어장의 모든 단어를 학습했습니다
+                  이 단어장의 모든 단어를 학습했습니다
                 </p>
               </div>
 
-              <Card className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-800">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">현재 세대</span>
-                    <Badge variant="outline" className="bg-white dark:bg-slate-800">
-                      {currentGeneration}차
-                    </Badge>
+              {/* 학습 통계 */}
+              <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">전체 단어</span>
+                    <span className="font-semibold text-base">{totalWords}개</span>
                   </div>
-                  <div className="flex items-center justify-center gap-3 py-2">
-                    <ArrowRight className="h-5 w-5 text-purple-500 animate-pulse" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">알고 있는 단어</span>
+                    <span className="font-semibold text-base text-green-600 dark:text-green-400">{totalWords - skippedCount}개</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">다음 세대</span>
-                    <Badge className="bg-purple-600 dark:bg-purple-500">
-                      {currentGeneration + 1}차
-                    </Badge>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">모르는 단어</span>
+                    <span className="font-semibold text-base text-orange-600 dark:text-orange-400">{skippedCount}개</span>
                   </div>
                 </div>
               </Card>
 
-              {nextGenerationCreated && (
-                <Card className="p-4 bg-muted/50">
-                  <div className="flex items-start gap-3">
-                    <TrendingDown className="h-5 w-5 text-orange-500 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold mb-1">
-                        복습이 필요한 단어: {skippedCount}개
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Skip한 단어만 모아서 {currentGeneration + 1}차 단어장을 자동으로 생성했습니다
-                      </p>
-                    </div>
-                  </div>
-                </Card>
+              {nextGenerationCreated && skippedCount > 0 && (
+                <p className="text-xs text-center text-muted-foreground">
+                  모르는 단어는 강사 페이지에 새 단어장으로 저장되었습니다
+                </p>
               )}
             </>
           )}
@@ -123,7 +119,7 @@ export function GenerationCompleteModal({
             className="w-full h-12 text-base"
             size="lg"
           >
-            {perfectCompletion ? '확인' : `${currentGeneration + 1}차 단어장 시작하기`}
+            확인
           </Button>
         </div>
       </DialogContent>

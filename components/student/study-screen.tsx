@@ -191,6 +191,26 @@ export function StudyScreen({ token }: { token: string }) {
     const isSessionComplete = progress.today >= progress.todayGoal
     const isGenerationComplete = progress.generationCompleted >= progress.generationTotal
 
+    // ⭐⭐⭐ 학습 완료 모달이 표시 중이면 빈 화면 + 모달 표시
+    if (showGenerationCompleteModal) {
+      return (
+        <div className="h-screen">
+          {/* 학습 완료 모달 */}
+          {generationModalData && currentWordlist && (
+            <GenerationCompleteModal
+              open={showGenerationCompleteModal}
+              onClose={() => setShowGenerationCompleteModal(false)}
+              totalWords={currentWordlist.total_words}
+              skippedCount={generationModalData.skippedCount}
+              nextGenerationCreated={generationModalData.nextGenerationCreated}
+              perfectCompletion={generationModalData.perfectCompletion}
+              studentToken={token}
+            />
+          )}
+        </div>
+      )
+    }
+    
     // 1. 회차 완료 (오늘의 목표 달성)
     if (isSessionComplete) {
       return (
@@ -232,7 +252,7 @@ export function StudyScreen({ token }: { token: string }) {
         </div>
       )
     }
-
+    
     // 2. 세대 완료 (모든 단어 완료)
     if (isGenerationComplete) {
       return (
@@ -260,8 +280,8 @@ export function StudyScreen({ token }: { token: string }) {
         </div>
       )
     }
-
-    // 3. 로딩 또는 기타 상태
+    
+    // 3. 로딩 (정상적인 다음 단어 대기 중)
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="p-8 max-w-md text-center space-y-4">
@@ -283,14 +303,6 @@ export function StudyScreen({ token }: { token: string }) {
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">{student.name}</h2>
             <Badge variant="outline">{progress.session}회차</Badge>
-            {currentAssignment && (
-              <Badge 
-                variant={currentAssignment.generation === 1 ? "default" : "secondary"} 
-                className={currentAssignment.generation > 1 ? "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-100" : ""}
-              >
-                {currentAssignment.generation}차
-              </Badge>
-            )}
           </div>
           {currentWordlist && (
             <div className="text-xs text-muted-foreground flex items-center gap-2">
@@ -301,7 +313,7 @@ export function StudyScreen({ token }: { token: string }) {
                 </Badge>
               )}
               <span className="text-muted-foreground/70">
-                · 세대 진행률: {progress.generationCompleted}/{progress.generationTotal} ({generationProgressPercentage.toFixed(0)}%)
+                · 전체 진행률: {progress.generationCompleted}/{progress.generationTotal} ({generationProgressPercentage.toFixed(0)}%)
               </span>
             </div>
           )}
@@ -437,15 +449,16 @@ export function StudyScreen({ token }: { token: string }) {
         />
       )}
 
-      {/* 세대 완료 모달 */}
-      {generationModalData && (
+      {/* 학습 완료 모달 */}
+      {generationModalData && currentWordlist && (
         <GenerationCompleteModal
           open={showGenerationCompleteModal}
           onClose={() => setShowGenerationCompleteModal(false)}
-          currentGeneration={generationModalData.currentGeneration}
+          totalWords={currentWordlist.total_words}
           skippedCount={generationModalData.skippedCount}
           nextGenerationCreated={generationModalData.nextGenerationCreated}
           perfectCompletion={generationModalData.perfectCompletion}
+          studentToken={token}
         />
       )}
 
