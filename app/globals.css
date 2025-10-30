@@ -80,6 +80,17 @@
   /* 인쇄 레이아웃 표시 */
   .screen-only {
     display: block !important;
+    position: relative !important;
+    color: #000 !important;
+    background-color: #fff !important;
+  }
+  
+  /* 제목 스타일 */
+  .screen-only h1 {
+    color: #000 !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    margin-bottom: 32px !important;
   }
   
   /* 인쇄 레이아웃 */
@@ -89,6 +100,8 @@
     column-rule: 1px solid #d1d5db !important;
     column-fill: auto !important;
     min-height: 10rem !important;
+    display: block !important;
+    color: #000 !important;
   }
   
   .print-word {
@@ -96,6 +109,9 @@
     page-break-inside: avoid !important;
     margin-bottom: 12px !important;
     line-height: 1.8 !important;
+    color: #000 !important;
+    display: block !important;
+    font-size: 14px !important;
   }
 }
 
