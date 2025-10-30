@@ -199,15 +199,23 @@ export function useStudySession(token: string) {
       hasCurrentAssignment: !!currentAssignment,
       currentWord: currentWord?.word_text || 'null',
       error,
-      isGeneratingReview
+      isGeneratingReview,
+      showGenerationCompleteModal
     })
+    
+    // ⭐ 세대 완료 모달이 표시 중이면 fetchNextWord 호출 안 함
+    if (showGenerationCompleteModal) {
+      console.log('🟡 [useEffect] 세대 완료 모달 표시 중, fetchNextWord() 호출 안 함')
+      return
+    }
+    
     if (!loading && student && currentAssignment && !currentWord && !error && !isGeneratingReview) {
       console.log('🟡 [useEffect] 조건 충족! fetchNextWord() 호출')
       fetchNextWord()
     } else {
       console.log('🟡 [useEffect] 조건 불충족, fetchNextWord() 호출 안 함')
     }
-  }, [loading, student, currentAssignment, isGeneratingReview])  // ⭐ isGeneratingReview 의존성 추가
+  }, [loading, student, currentAssignment, isGeneratingReview, showGenerationCompleteModal])  // ⭐ showGenerationCompleteModal 의존성 추가
 
   // 진행률 업데이트 함수
   const updateProgress = async (studentId: string, assignment: Assignment, wordlist: Wordlist) => {
@@ -285,6 +293,12 @@ export function useStudySession(token: string) {
       return
     }
 
+    // ⭐ 이미 복습 생성 중이거나 세대 완료 모달이 표시 중이면 중단
+    if (isGeneratingReview || showGenerationCompleteModal) {
+      console.log('🔵 [fetchNextWord] 이미 복습 생성 중이거나 세대 완료 모달 표시 중. 종료.')
+      return
+    }
+
     // ⭐ forceRefresh: 회차 완료 후 진행률을 먼저 새로고침
     if (forceRefresh && currentWordlist) {
       const refreshedProgress = await updateProgress(student.id, currentAssignment, currentWordlist)
@@ -352,6 +366,7 @@ export function useStudySession(token: string) {
               if (existingReview) {
                 console.log('⚠️ 복습 단어장이 이미 존재합니다. 중복 생성을 방지합니다.')
                 setIsGeneratingReview(false)
+                isGeneratingReviewRef.current = false
                 return
               }
               
@@ -377,6 +392,7 @@ export function useStudySession(token: string) {
                 console.error('❌ 복습 단어장 생성 실패:', err)
               } finally {
                 setIsGeneratingReview(false)
+                isGeneratingReviewRef.current = false
               }
               return  // ⭐ 무한 루프 방지
             } else if (skippedWords.length === 0) {
