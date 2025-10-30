@@ -64,22 +64,6 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     )
   }
 
-  // 전체 선택/해제 토글
-  const toggleSelectAll = () => {
-    if (selectedSessionsForExam.length === completedSessions.length) {
-      // 전체 선택 상태 → 전체 해제
-      setSelectedSessionsForExam([])
-    } else {
-      // 일부 또는 없음 → 전체 선택
-      const allSessionIds = completedSessions.map(session => session.id)
-      setSelectedSessionsForExam(allSessionIds)
-    }
-  }
-
-  // 전체 선택 여부 계산
-  const isAllSelected = completedSessions.length > 0 && 
-                        selectedSessionsForExam.length === completedSessions.length
-
   // 시험지 출력 핸들러
   const handleExamPrint = (type: 'known' | 'unknown') => {
     console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
@@ -126,6 +110,22 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   }
 
   const { student, currentAssignment, completedSessions } = data
+  
+  // 전체 선택/해제 토글
+  const toggleSelectAll = () => {
+    if (selectedSessionsForExam.length === completedSessions.length) {
+      // 전체 선택 상태 → 전체 해제
+      setSelectedSessionsForExam([])
+    } else {
+      // 일부 또는 없음 → 전체 선택
+      const allSessionIds = completedSessions.map(session => session.id)
+      setSelectedSessionsForExam(allSessionIds)
+    }
+  }
+
+  // 전체 선택 여부 계산
+  const isAllSelected = completedSessions.length > 0 && 
+                        selectedSessionsForExam.length === completedSessions.length
   
   // ⭐ 통계 계산
   const completedSessionsCount = completedSessions.length
