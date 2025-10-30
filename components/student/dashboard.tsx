@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
+import { ExamPrintModal } from '@/components/student/exam-print-modal'
 
 interface StudentDashboardProps {
   token: string
@@ -48,6 +49,11 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   // 시험지 출력용 체크박스 state
   const [selectedSessionsForExam, setSelectedSessionsForExam] = useState<string[]>([])
+  
+  // 시험지 출력 모달 state
+  const [examModalOpen, setExamModalOpen] = useState(false)
+  const [examModalType, setExamModalType] = useState<'known' | 'unknown'>('known')
+  const [examModalTitle, setExamModalTitle] = useState('')
 
   // 체크박스 토글 함수
   const toggleSessionSelection = (sessionId: string) => {
@@ -62,7 +68,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const handleExamPrint = (type: 'known' | 'unknown') => {
     console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
     console.log('선택된 회차:', selectedSessionsForExam)
-    // TODO: ExamPrintModal 열기
+    
+    const title = type === 'known' 
+      ? `아는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
+      : `모르는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
+    
+    setExamModalType(type)
+    setExamModalTitle(title)
+    setExamModalOpen(true)
   }
 
   if (loading) {
@@ -384,6 +397,15 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
           knownCount={selectedKnownSession.knownCount}
         />
       )}
+
+      {/* 시험지 출력 모달 */}
+      <ExamPrintModal
+        open={examModalOpen}
+        onClose={() => setExamModalOpen(false)}
+        sessionIds={selectedSessionsForExam}
+        type={examModalType}
+        title={examModalTitle}
+      />
     </div>
   )
 }
