@@ -5,6 +5,7 @@ import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useRouter } from 'next/navigation'
 import { 
   BookOpen, 
@@ -15,7 +16,8 @@ import {
   XCircle,
   Calendar,
   Play,
-  Award
+  Award,
+  Printer
 } from 'lucide-react'
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
@@ -43,6 +45,25 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     sessionNumber: number
     knownCount: number
   } | null>(null)
+
+  // 시험지 출력용 체크박스 state
+  const [selectedSessionsForExam, setSelectedSessionsForExam] = useState<string[]>([])
+
+  // 체크박스 토글 함수
+  const toggleSessionSelection = (sessionId: string) => {
+    setSelectedSessionsForExam(prev => 
+      prev.includes(sessionId)
+        ? prev.filter(id => id !== sessionId)
+        : [...prev, sessionId]
+    )
+  }
+
+  // 시험지 출력 핸들러
+  const handleExamPrint = (type: 'known' | 'unknown') => {
+    console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
+    console.log('선택된 회차:', selectedSessionsForExam)
+    // TODO: ExamPrintModal 열기
+  }
 
   if (loading) {
     return (
@@ -189,9 +210,37 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         {/* 학습 기록 */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
-              <CardTitle>학습 기록</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <CardTitle>학습 기록</CardTitle>
+              </div>
+              
+              {/* 시험지 출력 버튼들 */}
+              {completedSessions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={selectedSessionsForExam.length === 0}
+                    onClick={() => handleExamPrint('known')}
+                  >
+                    <Printer className="w-4 h-4" />
+                    아는 단어 시험지
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={selectedSessionsForExam.length === 0}
+                    onClick={() => handleExamPrint('unknown')}
+                  >
+                    <Printer className="w-4 h-4" />
+                    모르는 단어 시험지
+                  </Button>
+                </div>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -211,8 +260,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                     <Card key={session.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
-                          {/* 왼쪽: 회차 정보 */}
+                          {/* 왼쪽: 체크박스 + 회차 정보 */}
                           <div className="flex items-center gap-3">
+                            {/* 시험지 출력용 체크박스 */}
+                            <Checkbox
+                              checked={selectedSessionsForExam.includes(session.id)}
+                              onCheckedChange={() => toggleSessionSelection(session.id)}
+                            />
+                            
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
                               <Calendar className="w-5 h-5 text-blue-600" />
                             </div>
