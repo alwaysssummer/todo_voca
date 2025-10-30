@@ -16,8 +16,9 @@ interface Word {
 interface VocabularyPrintModalProps {
   open: boolean
   onClose: () => void
-  sessionIds: string[]
-  type: 'known' | 'unknown'
+  sessionIds?: string[]
+  wordlistId?: string
+  type?: 'known' | 'unknown'
   title: string
 }
 
@@ -25,6 +26,7 @@ export function VocabularyPrintModal({
   open,
   onClose,
   sessionIds,
+  wordlistId,
   type,
   title
 }: VocabularyPrintModalProps) {
@@ -32,10 +34,10 @@ export function VocabularyPrintModal({
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (open && sessionIds.length > 0) {
+    if (open && (wordlistId || (sessionIds && sessionIds.length > 0))) {
       loadWords()
     }
-  }, [open, sessionIds, type])
+  }, [open, sessionIds, wordlistId, type])
 
   // 인쇄 핸들러
   const handlePrint = () => {
@@ -170,55 +172,72 @@ export function VocabularyPrintModal({
   const loadWords = async () => {
     setLoading(true)
     try {
-      // 여러 회차의 데이터 가져오기
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('completed_wordlists')
-        .select('id, word_ids, unknown_word_ids')
-        .in('id', sessionIds)
+      let allWords: Word[] = []
 
-      if (sessionsError) throw sessionsError
+      // Case 1: 전체 단어장 (wordlistId가 있으면)
+      if (wordlistId) {
+        console.log('전체 단어장 로드:', wordlistId)
+        const { data: wordData, error: wordError } = await supabase
+          .from('words')
+          .select('id, word_text, meaning, sequence_order')
+          .eq('wordlist_id', wordlistId)
+          .order('sequence_order')
 
-      if (!sessions || sessions.length === 0) {
-        console.log('선택된 회차 데이터가 없습니다')
-        setWords([])
-        return
+        if (wordError) throw wordError
+        allWords = wordData || []
+        console.log('전체 단어 수:', allWords.length)
       }
+      // Case 2: 아는/모르는 단어장 (sessionIds가 있으면)
+      else if (sessionIds && sessionIds.length > 0) {
+        // 여러 회차의 데이터 가져오기
+        const { data: sessions, error: sessionsError } = await supabase
+          .from('completed_wordlists')
+          .select('id, word_ids, unknown_word_ids')
+          .in('id', sessionIds)
 
-      console.log('가져온 세션들:', sessions)
+        if (sessionsError) throw sessionsError
 
-      // 타입에 따라 단어 ID 수집
-      const wordIds: string[] = []
-      sessions.forEach(session => {
-        if (type === 'known' && session.word_ids) {
-          wordIds.push(...session.word_ids)
-        } else if (type === 'unknown' && session.unknown_word_ids) {
-          wordIds.push(...session.unknown_word_ids)
+        if (!sessions || sessions.length === 0) {
+          console.log('선택된 회차 데이터가 없습니다')
+          setWords([])
+          return
         }
-      })
 
-      console.log(`${type === 'known' ? '아는' : '모르는'} 단어 ID (중복 포함):`, wordIds.length)
+        console.log('가져온 세션들:', sessions)
 
-      // 중복 제거
-      const uniqueWordIds = Array.from(new Set(wordIds))
-      console.log('중복 제거 후:', uniqueWordIds.length)
+        // 타입에 따라 단어 ID 수집
+        const wordIds: string[] = []
+        sessions.forEach(session => {
+          if (type === 'known' && session.word_ids) {
+            wordIds.push(...session.word_ids)
+          } else if (type === 'unknown' && session.unknown_word_ids) {
+            wordIds.push(...session.unknown_word_ids)
+          }
+        })
 
-      if (uniqueWordIds.length === 0) {
-        console.log('단어가 없습니다')
-        setWords([])
-        return
+        console.log(`${type === 'known' ? '아는' : '모르는'} 단어 ID (중복 포함):`, wordIds.length)
+
+        // 중복 제거
+        const uniqueWordIds = Array.from(new Set(wordIds))
+        console.log('중복 제거 후:', uniqueWordIds.length)
+
+        if (uniqueWordIds.length === 0) {
+          console.log('단어가 없습니다')
+          setWords([])
+          return
+        }
+
+        // 단어 정보 가져오기
+        const { data: wordData, error: wordError } = await supabase
+          .from('words')
+          .select('id, word_text, meaning, sequence_order')
+          .in('id', uniqueWordIds)
+          .order('sequence_order')
+
+        if (wordError) throw wordError
+        allWords = wordData || []
+        console.log('가져온 단어 수:', allWords.length)
       }
-
-      // 단어 정보 가져오기
-      const { data: wordData, error: wordError } = await supabase
-        .from('words')
-        .select('id, word_text, meaning, sequence_order')
-        .in('id', uniqueWordIds)
-        .order('sequence_order')
-
-      if (wordError) throw wordError
-
-      const allWords = wordData || []
-      console.log('가져온 단어 수:', allWords.length)
       
       // 랜덤 추출 없이 전체 사용
       setWords(allWords)
@@ -268,8 +287,17 @@ export function VocabularyPrintModal({
             <div className="bg-green-50 p-4 rounded-lg text-sm">
               <p className="font-semibold mb-2">단어장 정보:</p>
               <ul className="space-y-1 text-muted-foreground">
-                <li>• 선택한 회차: {sessionIds.length}개</li>
-                <li>• 전체 {type === 'known' ? '아는' : '모르는'} 단어: <strong className="text-green-600">{words.length}개</strong> (중복 제거 완료)</li>
+                {wordlistId ? (
+                  <>
+                    <li>• 전체 단어장의 모든 단어</li>
+                    <li>• 총 단어 수: <strong className="text-green-600">{words.length}개</strong></li>
+                  </>
+                ) : (
+                  <>
+                    <li>• 선택한 회차: {sessionIds?.length || 0}개</li>
+                    <li>• 전체 {type === 'known' ? '아는' : '모르는'} 단어: <strong className="text-green-600">{words.length}개</strong> (중복 제거 완료)</li>
+                  </>
+                )}
                 <li className="text-xs text-blue-600 mt-2">📚 모든 단어가 순서대로 표시됩니다</li>
               </ul>
             </div>

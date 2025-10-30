@@ -98,6 +98,13 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     setVocabModalOpen(true)
   }
 
+  // 전체 단어장 출력 핸들러
+  const handleWholeVocabularyPrint = () => {
+    console.log('전체 단어장 출력')
+    setVocabModalTitle(`전체 단어장 (${currentAssignment.total_words}개)`)
+    setVocabModalOpen(true)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -259,57 +266,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         {/* 학습 기록 */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
-                <CardTitle>학습 기록</CardTitle>
-              </div>
-              
-              {/* 시험지 출력 버튼들 */}
-              {completedSessions.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={selectedSessionsForExam.length === 0}
-                    onClick={() => handleExamPrint('known')}
-                  >
-                    <Printer className="w-4 h-4" />
-                    아는 단어 시험지
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={selectedSessionsForExam.length === 0}
-                    onClick={() => handleExamPrint('unknown')}
-                  >
-                    <Printer className="w-4 h-4" />
-                    모르는 단어 시험지
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={selectedSessionsForExam.length === 0}
-                    onClick={() => handleVocabularyPrint('known')}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    아는 단어장
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    disabled={selectedSessionsForExam.length === 0}
-                    onClick={() => handleVocabularyPrint('unknown')}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    모르는 단어장
-                  </Button>
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-600" />
+              <CardTitle>학습 기록</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -321,18 +280,74 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* 전체 선택 체크박스 */}
-                <div className="flex items-center gap-2 pb-3 border-b">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                  <span className="text-sm font-medium text-muted-foreground">
-                    전체 선택
-                    <span className="ml-1 text-blue-600 font-semibold">
-                      ({selectedSessionsForExam.length}/{completedSessions.length})
+                {/* 전체 선택 + 출력 버튼들 */}
+                <div className="flex items-center justify-between gap-2 pb-3 border-b flex-wrap">
+                  {/* 왼쪽: 전체 선택 */}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      전체 선택
+                      <span className="ml-1 text-blue-600 font-semibold">
+                        ({selectedSessionsForExam.length}/{completedSessions.length})
+                      </span>
                     </span>
-                  </span>
+                  </div>
+                  
+                  {/* 오른쪽: 출력 버튼들 */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={selectedSessionsForExam.length === 0}
+                      onClick={() => handleExamPrint('known')}
+                    >
+                      <Printer className="w-4 h-4" />
+                      O
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={selectedSessionsForExam.length === 0}
+                      onClick={() => handleExamPrint('unknown')}
+                    >
+                      <Printer className="w-4 h-4" />
+                      X
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={selectedSessionsForExam.length === 0}
+                      onClick={() => handleVocabularyPrint('known')}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      O
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      disabled={selectedSessionsForExam.length === 0}
+                      onClick={() => handleVocabularyPrint('unknown')}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      X
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={handleWholeVocabularyPrint}
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      A
+                    </Button>
+                  </div>
                 </div>
 
                 {/* 회차 목록 */}
@@ -483,6 +498,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         open={vocabModalOpen}
         onClose={() => setVocabModalOpen(false)}
         sessionIds={selectedSessionsForExam}
+        wordlistId={currentAssignment.wordlist_id}
         type={vocabModalType}
         title={vocabModalTitle}
       />
