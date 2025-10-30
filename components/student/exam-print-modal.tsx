@@ -118,58 +118,119 @@ export function ExamPrintModal({
           }
         `}} />
 
-        {/* 시험지 (문제지) */}
-        <h1 style={{
-          fontSize: '24px',
-          fontWeight: 'bold',
-          marginBottom: '32px',
-          color: '#000'
-        }}>
-          {title}
-        </h1>
-
-        <div style={{
-          display: 'flex',
-          gap: '4rem',
-          color: '#000'
-        }}>
-          {/* 좌측 컬럼 */}
-          <div style={{
-            flex: 1,
-            borderRight: '1px solid #d1d5db',
-            paddingRight: '2rem'
+        {/* 시험지 (문제지) - 영어만 */}
+        <div className="exam-section">
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            marginBottom: '32px',
+            color: '#000'
           }}>
-            {leftColumn.map((word, index) => (
-              <div
-                key={word.id}
-                style={{
-                  marginBottom: '12px',
-                  lineHeight: '1.8',
-                  fontSize: '14px'
-                }}
-              >
-                {index + 1}. {word.word_text}
-              </div>
-            ))}
+            {title}
+          </h1>
+
+          <div style={{
+            display: 'flex',
+            gap: '4rem',
+            color: '#000'
+          }}>
+            {/* 좌측 컬럼 */}
+            <div style={{
+              flex: 1,
+              borderRight: '1px solid #d1d5db',
+              paddingRight: '2rem'
+            }}>
+              {leftColumn.map((word, index) => (
+                <div
+                  key={word.id}
+                  style={{
+                    marginBottom: '12px',
+                    lineHeight: '1.8',
+                    fontSize: '14px'
+                  }}
+                >
+                  {index + 1}. {word.word_text}
+                </div>
+              ))}
+            </div>
+
+            {/* 우측 컬럼 */}
+            <div style={{
+              flex: 1,
+              paddingLeft: '2rem'
+            }}>
+              {rightColumn.map((word, index) => (
+                <div
+                  key={word.id}
+                  style={{
+                    marginBottom: '12px',
+                    lineHeight: '1.8',
+                    fontSize: '14px'
+                  }}
+                >
+                  {leftColumn.length + index + 1}. {word.word_text}
+                </div>
+              ))}
+            </div>
           </div>
+        </div>
 
-          {/* 우측 컬럼 */}
-          <div style={{
-            flex: 1,
-            paddingLeft: '2rem'
+        {/* 답지 (정답지) - 영어 + 한글 뜻 */}
+        <div className="answer-section" style={{ marginTop: '64px' }}>
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
+            marginBottom: '32px',
+            color: '#000',
+            borderTop: '2px solid #000',
+            paddingTop: '32px'
           }}>
-            {rightColumn.map((word, index) => (
-              <div
-                key={word.id}
-                style={{
-                  marginBottom: '12px',
-                  lineHeight: '1.8',
-                  fontSize: '14px'
-                }}
-              >
-                {leftColumn.length + index + 1}. {word.word_text}
-              </div>
-            ))}
+            정답지
+          </h1>
+
+          <div style={{
+            display: 'flex',
+            gap: '4rem',
+            color: '#000'
+          }}>
+            {/* 좌측 컬럼 */}
+            <div style={{
+              flex: 1,
+              borderRight: '1px solid #d1d5db',
+              paddingRight: '2rem'
+            }}>
+              {leftColumn.map((word, index) => (
+                <div
+                  key={word.id}
+                  style={{
+                    marginBottom: '12px',
+                    lineHeight: '1.8',
+                    fontSize: '14px'
+                  }}
+                >
+                  {index + 1}. {word.word_text} : {word.meaning}
+                </div>
+              ))}
+            </div>
+
+            {/* 우측 컬럼 */}
+            <div style={{
+              flex: 1,
+              paddingLeft: '2rem'
+            }}>
+              {rightColumn.map((word, index) => (
+                <div
+                  key={word.id}
+                  style={{
+                    marginBottom: '12px',
+                    lineHeight: '1.8',
+                    fontSize: '14px'
+                  }}
+                >
+                  {leftColumn.length + index + 1}. {word.word_text} : {word.meaning}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
