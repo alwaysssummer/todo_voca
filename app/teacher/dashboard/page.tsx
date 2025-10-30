@@ -526,12 +526,12 @@ export default function TeacherDashboard() {
                         
                         <Badge variant="outline" className="gap-1">
                           <CheckCircle2 className="w-3 h-3" />
-                          O: {student.oTestCompleted}/{student.completedSessions}
+                          {student.oTestCompleted}/{student.completedSessions}
                         </Badge>
                         
                         <Badge variant="outline" className="gap-1">
                           <XCircle className="w-3 h-3" />
-                          X: {student.xTestCompleted}/{student.completedSessions}
+                          {student.xTestCompleted}/{student.completedSessions}
                         </Badge>
                         
                         <span className="text-sm font-medium">{student.progress}%</span>
