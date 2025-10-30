@@ -325,12 +325,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                               onCheckedChange={() => toggleSessionSelection(session.id)}
                             />
                             
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
-                              <Calendar className="w-5 h-5 text-blue-600" />
-                            </div>
                             <div>
                               <div className="font-semibold text-base">
-                                {session.session_number}회차 / {totalSessions}
+                                {String(session.session_number).padStart(2, '0')}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 {new Date(session.completed_date).toLocaleDateString('ko-KR', { 
