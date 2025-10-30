@@ -193,7 +193,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         {/* 학습 버튼 */}
         <Button 
           size="lg" 
-          className="w-full h-14 mb-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          className="w-full h-14 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
           onClick={() => router.push(`/s/${token}`)}
           disabled={isGenerationCompleted}
         >
@@ -223,7 +223,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
         {/* 학습 기록 */}
         <Card>
-          <CardContent>
+          <CardContent className="pt-4">
             {completedSessions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
