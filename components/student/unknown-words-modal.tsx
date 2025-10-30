@@ -156,11 +156,14 @@ export function UnknownWordsModal({
                 margin-bottom: 32px;
               }
 
-              /* 2단 컬럼 */
+              /* 2단 컬럼 (좌측 우선 채우기) */
               .word-columns {
                 columns: 2;
                 column-gap: 4rem;
                 column-rule: 1px solid #d1d5db;
+                column-fill: auto;  /* ⭐ 좌측부터 채우고 우측 상단으로 */
+                height: auto;
+                max-height: calc(297mm - 4cm - 80px);  /* A4 높이 - 여백 - 제목 */
               }
 
               /* 단어 항목 */
