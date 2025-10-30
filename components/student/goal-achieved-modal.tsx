@@ -36,8 +36,12 @@ export function GoalAchievedModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]">
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent 
+        className="sm:max-w-[400px]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         <div className="text-center space-y-6 py-6">
           {/* 축하 아이콘 */}
           <div className="flex justify-center">
