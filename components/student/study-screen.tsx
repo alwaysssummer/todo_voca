@@ -240,7 +240,14 @@ export function StudyScreen({ token }: { token: string }) {
               )}
               
               <Button 
-                onClick={() => window.location.href = `/s/${token}/dashboard`}
+                onClick={() => {
+                  // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
+                  const isMobile = window.location.pathname.includes('/mobile/')
+                  const dashboardPath = isMobile 
+                    ? `/s/${token}/mobile/dashboard`
+                    : `/s/${token}/dashboard`
+                  window.location.href = dashboardPath
+                }}
                 variant={pendingTest.hasPendingTest ? "outline" : "default"}
                 className="w-full"
                 size="lg"
@@ -270,7 +277,14 @@ export function StudyScreen({ token }: { token: string }) {
             </div>
 
             <Button 
-              onClick={() => window.location.href = `/s/${token}/dashboard`}
+              onClick={() => {
+                // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
+                const isMobile = window.location.pathname.includes('/mobile/')
+                const dashboardPath = isMobile 
+                  ? `/s/${token}/mobile/dashboard`
+                  : `/s/${token}/dashboard`
+                window.location.href = dashboardPath
+              }}
               className="w-full"
               size="lg"
             >

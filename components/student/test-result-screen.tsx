@@ -28,7 +28,12 @@ export function TestResultScreen({ result, studentToken }: TestResultScreenProps
   const router = useRouter()
 
   const handleGoToDashboard = () => {
-    router.push(`/s/${studentToken}/dashboard`)
+    // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
+    const isMobile = window.location.pathname.includes('/mobile/')
+    const dashboardPath = isMobile 
+      ? `/s/${studentToken}/mobile/dashboard`
+      : `/s/${studentToken}/dashboard`
+    router.push(dashboardPath)
   }
 
   return (
