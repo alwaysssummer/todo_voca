@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Users, 
   BookOpen, 
@@ -76,6 +77,7 @@ export default function TeacherDashboard() {
   const [editingWordlistName, setEditingWordlistName] = useState('')
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
   const [editingStudentName, setEditingStudentName] = useState('')
+  const [selectedWordlists, setSelectedWordlists] = useState<string[]>([])
 
   useEffect(() => {
     // 로그인 확인
@@ -454,6 +456,76 @@ export default function TeacherDashboard() {
     setEditingStudentName('')
   }
 
+  // 단어장 체크박스 토글
+  const toggleWordlistSelection = (wordlistId: string) => {
+    setSelectedWordlists(prev => 
+      prev.includes(wordlistId)
+        ? prev.filter(id => id !== wordlistId)
+        : [...prev, wordlistId]
+    )
+  }
+
+  // 전체 선택/해제 토글
+  const toggleSelectAllWordlists = () => {
+    if (selectedWordlists.length === wordlists.length) {
+      setSelectedWordlists([])
+    } else {
+      setSelectedWordlists(wordlists.map(w => w.id))
+    }
+  }
+
+  // 선택된 단어장 일괄 삭제
+  const handleDeleteSelectedWordlists = async () => {
+    if (selectedWordlists.length === 0) return
+
+    // 선택된 단어장 정보 가져오기
+    const selectedItems = wordlists.filter(w => selectedWordlists.includes(w.id))
+    const assignedCount = selectedItems.filter(w => w.assignedStudents > 0).length
+    const totalAssignedStudents = selectedItems.reduce((sum, w) => sum + w.assignedStudents, 0)
+
+    // 확인 메시지
+    let confirmMessage = `선택한 ${selectedWordlists.length}개의 단어장을 삭제하시겠습니까?\n\n`
+    
+    if (assignedCount > 0) {
+      confirmMessage += `⚠️ 경고: ${assignedCount}개의 단어장이 총 ${totalAssignedStudents}명의 학생에게 배정되어 있습니다.\n\n`
+      confirmMessage += `삭제 시 다음 데이터가 모두 삭제됩니다:\n`
+      confirmMessage += `- 단어장의 모든 단어\n`
+      confirmMessage += `- 학생들의 학습 진도\n`
+      confirmMessage += `- 학생들의 완성 단어장\n`
+      confirmMessage += `- 학생들의 테스트 기록\n\n`
+      confirmMessage += `정말로 삭제하시겠습니까?`
+    } else {
+      confirmMessage += `⚠️ 모든 단어 데이터가 삭제됩니다.`
+    }
+
+    if (!confirm(confirmMessage)) return
+
+    // 2차 확인 (배정된 경우)
+    if (assignedCount > 0) {
+      const secondConfirm = confirm(
+        `최종 확인: ${selectedWordlists.length}개 단어장과\n${totalAssignedStudents}명 학생의 모든 관련 데이터를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!`
+      )
+      if (!secondConfirm) return
+    }
+
+    try {
+      // 선택된 단어장 삭제 (CASCADE로 관련 데이터 자동 삭제)
+      const { error } = await supabase
+        .from('wordlists')
+        .delete()
+        .in('id', selectedWordlists)
+
+      if (error) throw error
+
+      alert(`${selectedWordlists.length}개의 단어장이 삭제되었습니다.`)
+      setSelectedWordlists([])
+      loadDashboardData()
+    } catch (err: any) {
+      console.error('단어장 일괄 삭제 실패:', err)
+      alert(err.message || '단어장 삭제 중 오류가 발생했습니다.')
+    }
+  }
+
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -719,7 +791,7 @@ export default function TeacherDashboard() {
         {/* 단어장 목록 */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-4">
               <CardTitle>단어장 목록</CardTitle>
               <Button 
                 size="sm" 
@@ -730,6 +802,37 @@ export default function TeacherDashboard() {
                 단어장 추가
               </Button>
             </div>
+            
+            {/* 전체 선택 + 선택 삭제 버튼 */}
+            {wordlists.length > 0 && (
+              <div className="flex items-center justify-between gap-2 pb-3 border-b">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={selectedWordlists.length === wordlists.length}
+                    onCheckedChange={toggleSelectAllWordlists}
+                  />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    전체 선택
+                    {selectedWordlists.length > 0 && (
+                      <span className="ml-1 text-blue-600 font-semibold">
+                        ({selectedWordlists.length}/{wordlists.length})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  disabled={selectedWordlists.length === 0}
+                  onClick={handleDeleteSelectedWordlists}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  선택 삭제
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {wordlists.length === 0 ? (
@@ -744,6 +847,12 @@ export default function TeacherDashboard() {
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-center gap-4 flex-1">
+                      {/* 체크박스 */}
+                      <Checkbox
+                        checked={selectedWordlists.includes(wordlist.id)}
+                        onCheckedChange={() => toggleWordlistSelection(wordlist.id)}
+                      />
+                      
                       {/* 단어장 이름 - 편집 모드 */}
                       {editingWordlistId === wordlist.id ? (
                         <div className="flex items-center gap-2">
