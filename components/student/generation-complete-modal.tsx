@@ -43,8 +43,8 @@ export function GenerationCompleteModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md [&>button]:hidden">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             {perfectCompletion ? (
@@ -110,12 +110,6 @@ export function GenerationCompleteModal({
                   </div>
                 </div>
               </Card>
-
-              {nextGenerationCreated && skippedCount > 0 && (
-                <p className="text-xs text-center text-muted-foreground">
-                  모르는 단어는 강사 페이지에 복습 단어장으로 저장되었습니다
-                </p>
-              )}
             </>
           )}
 
