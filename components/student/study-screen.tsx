@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +48,28 @@ export function StudyScreen({ token }: { token: string }) {
   const [showDontKnowScreen, setShowDontKnowScreen] = useState(false)
   const [dontKnowCountdown, setDontKnowCountdown] = useState(3)
   const [dontKnowWord, setDontKnowWord] = useState<Word | null>(null)
+  
+  // 🆕 Phase 1-1: 타이머 메모리 관리
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const autoProgressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const remainingTimeRef = useRef<number>(3000) // 남은 시간 (밀리초)
+  
+  // 🆕 Phase 1-2: 일시정지/재개 상태
+  const [isPaused, setIsPaused] = useState(false)
+  
+  // 🆕 Phase 1-1: 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+        console.log('🧹 [Cleanup] 카운트다운 타이머 정리')
+      }
+      if (autoProgressTimeoutRef.current) {
+        clearTimeout(autoProgressTimeoutRef.current)
+        console.log('🧹 [Cleanup] 자동진행 타이머 정리')
+      }
+    }
+  }, [])
 
   const onKnowClick = async () => {
     // 중복 클릭 방지
@@ -98,6 +120,61 @@ export function StudyScreen({ token }: { token: string }) {
     // 일일 목표만 완료한 경우, 다음 단어 로드는 handleKnow에서 이미 처리됨
   }
 
+  // 🆕 Phase 1-3: 일시정지/재개 토글 함수
+  const togglePause = () => {
+    if (!showDontKnowScreen) {
+      console.log('⚠️ [togglePause] 강조 화면이 아닙니다. 무시합니다.')
+      return
+    }
+    
+    // 🔒 Phase 1-3: 항상 기존 타이머 정리 먼저 (중복 방지)
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+      countdownIntervalRef.current = null
+    }
+    if (autoProgressTimeoutRef.current) {
+      clearTimeout(autoProgressTimeoutRef.current)
+      autoProgressTimeoutRef.current = null
+    }
+    
+    const newPaused = !isPaused
+    setIsPaused(newPaused)
+    
+    if (newPaused) {
+      // 일시정지
+      remainingTimeRef.current = dontKnowCountdown * 1000
+      console.log('⏸️ [일시정지] 남은 시간:', remainingTimeRef.current + 'ms')
+    } else {
+      // 재개
+      console.log('▶️ [재개] 남은 시간:', remainingTimeRef.current + 'ms')
+      
+      // 카운트다운 재시작
+      let countdown = Math.ceil(remainingTimeRef.current / 1000)
+      countdownIntervalRef.current = setInterval(() => {
+        remainingTimeRef.current -= 1000
+        countdown = Math.ceil(remainingTimeRef.current / 1000)
+        setDontKnowCountdown(Math.max(0, countdown))
+        console.log('🔴 [카운트다운 재개]:', countdown)
+        
+        if (countdown <= 0) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+            countdownIntervalRef.current = null
+          }
+        }
+      }, 1000)
+      
+      // 자동 진행 타이머 재시작 (남은 시간만큼)
+      autoProgressTimeoutRef.current = setTimeout(async () => {
+        console.log('🔴 [자동 진행] 강조 화면 숨김, 다음 단어 로드')
+        setShowDontKnowScreen(false)
+        setDontKnowWord(null)
+        setIsPaused(false)
+        await fetchNextWord()
+      }, remainingTimeRef.current)
+    }
+  }
+
   const onDontKnowClick = async () => {
     if (!currentWord) return
     
@@ -115,27 +192,34 @@ export function StudyScreen({ token }: { token: string }) {
       if (result) {
         setCurrentSkipCount(result.skipCount)
         
-        // 2. "모른다" 강조 화면 표시
+        // 🆕 Phase 1-4: 초기화
         setShowDontKnowScreen(true)
         setDontKnowCountdown(3)
+        setIsPaused(false) // 일시정지 해제
+        remainingTimeRef.current = 3000 // 3초로 리셋
         console.log('🔴 [모른다 클릭] 강조 화면 표시 시작')
         
-        // 3. 카운트다운 시작
+        // 🆕 Phase 1-4: ref 기반 타이머 시작
         let countdown = 3
-        const countdownInterval = setInterval(() => {
+        countdownIntervalRef.current = setInterval(() => {
           countdown -= 1
+          remainingTimeRef.current = countdown * 1000
           setDontKnowCountdown(countdown)
           console.log('🔴 [카운트다운]:', countdown)
           if (countdown <= 0) {
-            clearInterval(countdownInterval)
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current)
+              countdownIntervalRef.current = null
+            }
           }
         }, 1000)
         
-        // 4. 3초 후 강조 화면 숨기고 다음 단어 로드
-        setTimeout(async () => {
+        // 🆕 Phase 1-4: ref 기반 자동 진행 타이머
+        autoProgressTimeoutRef.current = setTimeout(async () => {
           console.log('🔴 [3초 후] 강조 화면 숨김, 다음 단어 로드 시작')
           setShowDontKnowScreen(false)
           setDontKnowWord(null)
+          setIsPaused(false)
           // 다음 단어 로드
           console.log('🔴 [3초 후] fetchNextWord 호출...')
           await fetchNextWord()
@@ -438,10 +522,16 @@ export function StudyScreen({ token }: { token: string }) {
         />
       )}
 
-      {/* "모른다" 강조 화면 - Option 4 V1 */}
+      {/* "모른다" 강조 화면 - Option 4 V1 + Phase 1-5: 일시정지 기능 */}
       {showDontKnowScreen && dontKnowWord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <Card className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm cursor-pointer"
+          onClick={togglePause}
+        >
+          <Card 
+            className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CardContent className="p-12 text-center space-y-6">
               {/* 단어 (초대형) */}
               <div className="text-6xl font-bold text-gray-900">
@@ -467,6 +557,13 @@ export function StudyScreen({ token }: { token: string }) {
                 </div>
               )}
               
+              {/* 🆕 Phase 1-5: 일시정지 안내 */}
+              {isPaused && (
+                <div className="text-sm text-blue-600 font-semibold animate-pulse">
+                  ⏸️ 일시정지 (화면을 다시 터치하여 계속)
+                </div>
+              )}
+              
               {/* 카운트다운 */}
               <div className="text-2xl text-gray-500 font-mono">
                 {dontKnowCountdown}
@@ -478,10 +575,15 @@ export function StudyScreen({ token }: { token: string }) {
                   className="bg-red-500 h-full transition-all"
                   style={{ 
                     width: `${((3 - dontKnowCountdown) / 3) * 100}%`,
-                    transitionDuration: '1000ms',
+                    transitionDuration: isPaused ? '0ms' : '1000ms',
                     transitionTimingFunction: 'linear'
                   }}
                 />
+              </div>
+              
+              {/* 🆕 Phase 1-5: 안내 텍스트 */}
+              <div className="text-xs text-gray-400 mt-4">
+                {isPaused ? '화면을 터치하여 계속' : '화면을 터치하여 일시정지'}
               </div>
             </CardContent>
           </Card>
