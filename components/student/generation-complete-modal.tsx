@@ -14,7 +14,7 @@ interface GenerationCompleteModalProps {
   totalWords: number  // 전체 단어 수
   skippedCount: number  // 모르는 단어 수
   nextGenerationCreated: boolean  // 복습 단어장 생성 여부
-  perfectCompletion: boolean  // 완벽 암기 여부
+  perfectCompletion: boolean  // 학습 완료 여부
   studentToken?: string  // 대시보드 이동을 위한 토큰
 }
 
@@ -126,7 +126,7 @@ export function GenerationCompleteModal({
             {perfectCompletion ? (
               <>
                 <Trophy className="h-6 w-6 text-yellow-500 animate-bounce" />
-                <span className="animate-pulse">완벽 암기 완료!</span>
+                <span className="animate-pulse">학습 완료!</span>
               </>
             ) : (
               <>
@@ -139,7 +139,7 @@ export function GenerationCompleteModal({
 
         <div className="space-y-6 py-4">
           {perfectCompletion ? (
-            // 완벽 암기 케이스
+            // 학습 완료 케이스
             <div 
               className="text-center space-y-4"
               style={{ animation: 'scaleIn 0.5s ease-out' }}
@@ -154,7 +154,7 @@ export function GenerationCompleteModal({
                 className="text-lg font-semibold"
                 style={{ animation: 'fadeInUp 0.8s ease-out 0.3s both' }}
               >
-                모든 단어를 완벽하게 암기했습니다!
+                모든 단어를 학습 완료했습니다!
               </p>
               <Card 
                 className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800"
