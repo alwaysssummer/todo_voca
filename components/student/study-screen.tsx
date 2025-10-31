@@ -576,12 +576,11 @@ export function StudyScreen({ token }: { token: string }) {
       {/* "모른다" 강조 화면 - Option 4 V1 + Phase 1-5: 일시정지 기능 */}
       {showDontKnowScreen && dontKnowWord && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm cursor-pointer"
-          onClick={togglePause}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
         >
           <Card 
-            className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+            className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl cursor-pointer"
+            onClick={togglePause}
           >
             <CardContent className="p-12 text-center space-y-6">
               {/* 단어 (초대형) */}
