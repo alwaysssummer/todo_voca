@@ -126,7 +126,10 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
         <Button 
           size="lg" 
           className="w-full h-16 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-base"
-          onClick={() => router.push(`/s/${token}`)}
+          onClick={() => {
+            sessionStorage.setItem('dashboardMode', 'mobile')
+            router.push(`/s/${token}/mobile/study`)
+          }}
           disabled={isGenerationCompleted}
         >
           {isGenerationCompleted ? (
@@ -224,7 +227,10 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                                 // 평가 전: 회색 원 버튼
                                 <button
                                   className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
-                                  onClick={() => router.push(`/s/${token}/test/${session.id}?type=known`)}
+                                  onClick={() => {
+                                    sessionStorage.setItem('dashboardMode', 'mobile')
+                                    router.push(`/s/${token}/test/${session.id}?type=known`)
+                                  }}
                                   title="O-TEST 평가 시작"
                                   aria-label="O-TEST 평가 시작하기"
                                 />
@@ -286,7 +292,10 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                                 // 평가 전: 회색 원 버튼
                                 <button
                                   className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
-                                  onClick={() => router.push(`/s/${token}/test/${session.id}?type=unknown`)}
+                                  onClick={() => {
+                                    sessionStorage.setItem('dashboardMode', 'mobile')
+                                    router.push(`/s/${token}/test/${session.id}?type=unknown`)
+                                  }}
                                   title="X-TEST 평가 시작"
                                   aria-label="X-TEST 평가 시작하기"
                                 />

@@ -382,8 +382,9 @@ export function StudyScreen({ token }: { token: string }) {
               
               <Button 
                 onClick={() => {
-                  // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
-                  const isMobile = window.location.pathname.includes('/mobile/')
+                  // sessionStorage 또는 URL 경로로 모바일 모드 판단
+                  const isMobile = sessionStorage.getItem('dashboardMode') === 'mobile' ||
+                                   window.location.pathname.includes('/mobile/')
                   const dashboardPath = isMobile 
                     ? `/s/${token}/mobile/dashboard`
                     : `/s/${token}/dashboard`
@@ -393,7 +394,7 @@ export function StudyScreen({ token }: { token: string }) {
                 className="w-full"
                 size="lg"
               >
-                📊 대시보드로
+                확인
               </Button>
             </div>
           </Card>
@@ -419,8 +420,9 @@ export function StudyScreen({ token }: { token: string }) {
 
             <Button 
               onClick={() => {
-                // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
-                const isMobile = window.location.pathname.includes('/mobile/')
+                // sessionStorage 또는 URL 경로로 모바일 모드 판단
+                const isMobile = sessionStorage.getItem('dashboardMode') === 'mobile' ||
+                                 window.location.pathname.includes('/mobile/')
                 const dashboardPath = isMobile 
                   ? `/s/${token}/mobile/dashboard`
                   : `/s/${token}/dashboard`
@@ -429,7 +431,7 @@ export function StudyScreen({ token }: { token: string }) {
               className="w-full"
               size="lg"
             >
-              📊 대시보드로
+              확인
             </Button>
           </Card>
         </div>
