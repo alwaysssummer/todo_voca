@@ -57,6 +57,9 @@ export function StudyScreen({ token }: { token: string }) {
   // 🆕 Phase 1-2: 일시정지/재개 상태
   const [isPaused, setIsPaused] = useState(false)
   
+  // 🆕 Phase 2-1: 클릭 쿨다운 (빠른 연속 클릭 방지)
+  const [clickCooldown, setClickCooldown] = useState(false)
+  
   // 🆕 Phase 1-1: 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
     return () => {
@@ -70,6 +73,28 @@ export function StudyScreen({ token }: { token: string }) {
       }
     }
   }, [])
+
+  // 🆕 Phase 2-2: 모달 충돌 감지 (목표 달성 or 단어장 완료 시 타이머 정리)
+  useEffect(() => {
+    if (goalModalOpen || showGenerationCompleteModal) {
+      console.log('🚨 [모달 충돌 감지] 타이머 강제 정리')
+      
+      // 모든 타이머 정리
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+        countdownIntervalRef.current = null
+      }
+      if (autoProgressTimeoutRef.current) {
+        clearTimeout(autoProgressTimeoutRef.current)
+        autoProgressTimeoutRef.current = null
+      }
+      
+      // 상태 초기화
+      setShowDontKnowScreen(false)
+      setDontKnowWord(null)
+      setIsPaused(false)
+    }
+  }, [goalModalOpen, showGenerationCompleteModal])
 
   const onKnowClick = async () => {
     // 중복 클릭 방지
@@ -120,12 +145,28 @@ export function StudyScreen({ token }: { token: string }) {
     // 일일 목표만 완료한 경우, 다음 단어 로드는 handleKnow에서 이미 처리됨
   }
 
-  // 🆕 Phase 1-3: 일시정지/재개 토글 함수
+  // 🆕 Phase 1-3: 일시정지/재개 토글 함수 (Phase 2-1: 개선)
   const togglePause = () => {
+    // 🔒 Phase 2-1: 화면 상태 체크
     if (!showDontKnowScreen) {
       console.log('⚠️ [togglePause] 강조 화면이 아닙니다. 무시합니다.')
       return
     }
+    
+    // 🔒 Phase 2-1: 처리 중 체크
+    if (isProcessing) {
+      console.log('⚠️ [togglePause] 아직 준비 중입니다. 잠시만 기다려주세요.')
+      return
+    }
+    
+    // 🔒 Phase 2-1: 클릭 쿨다운 체크 (300ms)
+    if (clickCooldown) {
+      console.log('⚠️ [togglePause] 너무 빠른 클릭입니다.')
+      return
+    }
+    
+    setClickCooldown(true)
+    setTimeout(() => setClickCooldown(false), 300)
     
     // 🔒 Phase 1-3: 항상 기존 타이머 정리 먼저 (중복 방지)
     if (countdownIntervalRef.current) {
@@ -144,6 +185,16 @@ export function StudyScreen({ token }: { token: string }) {
       // 일시정지
       remainingTimeRef.current = dontKnowCountdown * 1000
       console.log('⏸️ [일시정지] 남은 시간:', remainingTimeRef.current + 'ms')
+      
+      // 🔒 Phase 2-2: 0초 이하 체크
+      if (remainingTimeRef.current <= 0) {
+        console.log('⚠️ [일시정지] 이미 완료되었습니다. 다음 단어로 이동합니다.')
+        setShowDontKnowScreen(false)
+        setDontKnowWord(null)
+        setIsPaused(false)
+        fetchNextWord()
+        return
+      }
     } else {
       // 재개
       console.log('▶️ [재개] 남은 시간:', remainingTimeRef.current + 'ms')
