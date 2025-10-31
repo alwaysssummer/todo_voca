@@ -453,10 +453,17 @@ export function StudyScreen({ token }: { token: string }) {
                 {dontKnowWord.meaning}
               </div>
               
-              {/* 예문 (있으면 표시) */}
-              {dontKnowWord.example && (
-                <div className="text-lg text-gray-600 pt-4 border-t-2 border-gray-200">
-                  {dontKnowWord.example}
+              {/* 연상암기 (있으면 표시) */}
+              {dontKnowWord.mnemonic && (
+                <div className="pt-4 border-t-2 border-gray-200">
+                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-2">
+                      <span className="text-2xl">🧠</span>
+                      <p className="text-lg text-blue-800 dark:text-blue-200 flex-1">
+                        {dontKnowWord.mnemonic}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
               
