@@ -66,20 +66,31 @@ export async function fetchSheetData(sheetUrl: string): Promise<SheetData> {
   
   const csvText = await response.text()
   
-  // 3. CSV 파싱
+  // 3. CSV 파싱 (순서 기반, 헤더 무시)
   const parsed = Papa.parse<any>(csvText, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (header) => header.trim().toLowerCase()
+    header: false,
+    skipEmptyLines: true
   })
   
   if (parsed.errors.length > 0) {
     console.error('CSV 파싱 오류:', parsed.errors)
   }
   
+  // 첫 번째 행은 헤더로 간주하고 제외, 2행부터 데이터로 처리
+  const dataRows = parsed.data.slice(1)
+  
+  // 컬럼 순서: A=word_text, B=meaning, C=mnemonic, D=example, E=example_translation
+  const words = dataRows.map((row: any[]) => ({
+    word_text: row[0]?.toString().trim() || '',
+    meaning: row[1]?.toString().trim() || '',
+    mnemonic: row[2]?.toString().trim() || undefined,
+    example: row[3]?.toString().trim() || undefined,
+    example_translation: row[4]?.toString().trim() || undefined
+  })).filter(word => word.word_text && word.meaning) // 필수값이 있는 행만 포함
+  
   return {
     title,
-    words: parsed.data
+    words
   }
 }
 

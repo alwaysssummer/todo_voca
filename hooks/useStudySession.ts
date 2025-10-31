@@ -12,7 +12,7 @@ import type { Word } from '@/types/word'
  * 진행률 계산 (순수 함수)
  * @param completedCount - 완료한 단어 개수
  * @param sessionGoal - 회차당 목표 단어 개수
- * @param totalWords - 세대 전체 단어 개수
+ * @param totalWords - 단어장 전체 단어 개수
  * @returns 계산된 진행률 정보
  */
 function calculateProgress(
@@ -119,8 +119,8 @@ export function useStudySession(token: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isGeneratingReview, setIsGeneratingReview] = useState(false)  // ⭐ 중복 방지 플래그
-  const [showGenerationCompleteModal, setShowGenerationCompleteModal] = useState(false)  // ⭐ 세대 완료 모달
-  const [generationModalData, setGenerationModalData] = useState<any>(null)  // ⭐ 세대 완료 모달 데이터
+  const [showGenerationCompleteModal, setShowGenerationCompleteModal] = useState(false)  // ⭐ 단어장 완료 모달
+  const [generationModalData, setGenerationModalData] = useState<any>(null)  // ⭐ 단어장 완료 모달 데이터
   const isGeneratingReviewRef = useRef(false)  // ⭐ useRef로 즉시 중복 방지
 
   // 학생 정보 및 현재 활성 assignment 가져오기
@@ -145,7 +145,7 @@ export function useStudySession(token: string) {
           session_goal: studentData.daily_goal
         })
 
-        // 2. 현재 활성 assignment 가져오기 (최고 세대)
+        // 2. 현재 활성 assignment 가져오기
         const { data: assignments, error: assignmentError } = await supabase
           .from('student_wordlists')
           .select('id, wordlist_id, base_wordlist_id, generation, parent_assignment_id, filtered_word_ids, is_auto_generated, daily_goal, assigned_by')
@@ -203,9 +203,9 @@ export function useStudySession(token: string) {
       showGenerationCompleteModal
     })
     
-    // ⭐ 세대 완료 모달이 표시 중이면 fetchNextWord 호출 안 함
+    // ⭐ 단어장 완료 모달이 표시 중이면 fetchNextWord 호출 안 함
     if (showGenerationCompleteModal) {
-      console.log('🟡 [useEffect] 세대 완료 모달 표시 중, fetchNextWord() 호출 안 함')
+      console.log('🟡 [useEffect] 단어장 완료 모달 표시 중, fetchNextWord() 호출 안 함')
       return
     }
     
@@ -219,7 +219,7 @@ export function useStudySession(token: string) {
 
   // 진행률 업데이트 함수
   const updateProgress = async (studentId: string, assignment: Assignment, wordlist: Wordlist) => {
-    // A. 세대 전체 완료 개수
+    // A. 단어장 전체 완료 개수
     let generationQuery = supabase
       .from('student_word_progress')
       .select('*', { count: 'exact', head: true })
@@ -232,7 +232,7 @@ export function useStudySession(token: string) {
 
     const { count: generationCompletedCount } = await generationQuery
 
-    // B. 세대 전체 단어 수
+    // B. 단어장 전체 단어 수
     const generationTotal = assignment.filtered_word_ids?.length || wordlist.total_words
 
     // C. 현재 회차 및 회차 내 진행률 계산
@@ -293,9 +293,9 @@ export function useStudySession(token: string) {
       return
     }
 
-    // ⭐ 이미 복습 생성 중이거나 세대 완료 모달이 표시 중이면 중단
+    // ⭐ 이미 복습 생성 중이거나 단어장 완료 모달이 표시 중이면 중단
     if (isGeneratingReview || showGenerationCompleteModal) {
-      console.log('🔵 [fetchNextWord] 이미 복습 생성 중이거나 세대 완료 모달 표시 중. 종료.')
+      console.log('🔵 [fetchNextWord] 이미 복습 생성 중이거나 단어장 완료 모달 표시 중. 종료.')
       return
     }
 
@@ -671,7 +671,7 @@ export function useStudySession(token: string) {
           student_id: student.id,
           wordlist_id: newWordlist.id,
           base_wordlist_id: newWordlist.id,  // ⭐ 새 단어장이 base가 됨
-          generation: 1,  // 1세대로 시작
+          generation: 1,  // 독립적인 단어장
           parent_assignment_id: null,  // 독립적인 단어장
           filtered_word_ids: null,  // 전체 단어 학습
           daily_goal: suggestedDailyGoal,
@@ -907,7 +907,7 @@ export function useStudySession(token: string) {
         const completedData = await createCompletedWordlist(newCompleted)
         console.log('🟢 [handleKnow] 완성 단어장 생성 완료:', completedData)
         
-        // ⭐⭐⭐ 중요: 세대 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
+        // ⭐⭐⭐ 중요: 단어장 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
         console.log('🟢 [handleKnow] setCurrentWord(null) 호출 - 무한 루프 방지!')
         setCurrentWord(null)
         

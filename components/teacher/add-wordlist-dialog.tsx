@@ -124,10 +124,10 @@ export function AddWordlistDialog({
   }
 
   const downloadTemplate = () => {
-    const csv = `word_text,meaning,example,example_translation,mnemonic
-apple,사과,I eat an apple every day.,나는 매일 사과를 먹는다.,
-book,책,Read a book.,책을 읽어.,
-computer,컴퓨터,Use a computer.,컴퓨터를 사용해.,`
+    const csv = `영단어,뜻,연상법,예문,예문 번역
+apple,사과,빨간 사과,I eat an apple every day.,나는 매일 사과를 먹는다.
+book,책,,Read a book.,책을 읽어.
+computer,컴퓨터,컴퓨팅,Use a computer.,컴퓨터를 사용해.`
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -175,12 +175,18 @@ computer,컴퓨터,Use a computer.,컴퓨터를 사용해.,`
               <AlertDescription className="space-y-2">
                 <p className="font-medium text-sm">시트 형식:</p>
                 <div className="text-xs font-mono bg-muted p-2 rounded">
-                  <div>A열: word_text (영단어)</div>
-                  <div>B열: meaning (뜻)</div>
-                  <div>C열: example (예문, 선택)</div>
-                  <div>D열: example_translation (예문 번역, 선택)</div>
-                  <div>E열: mnemonic (연상법, 선택)</div>
+                  <div>A열: 영단어 (필수)</div>
+                  <div>B열: 뜻 (필수)</div>
+                  <div>C열: 연상법 (선택)</div>
+                  <div>D열: 예문 (선택)</div>
+                  <div>E열: 예문 번역 (선택)</div>
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  * 1행은 헤더로 자동 제외됩니다
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  * 헤더 이름과 관계없이 컬럼 순서로 데이터를 읽습니다
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
