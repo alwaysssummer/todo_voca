@@ -74,6 +74,8 @@ export default function TeacherDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [editingWordlistId, setEditingWordlistId] = useState<string | null>(null)
   const [editingWordlistName, setEditingWordlistName] = useState('')
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
+  const [editingStudentName, setEditingStudentName] = useState('')
 
   useEffect(() => {
     // 로그인 확인
@@ -413,6 +415,45 @@ export default function TeacherDashboard() {
     setEditingWordlistName('')
   }
 
+  const handleEditStudentName = (studentId: string, currentName: string) => {
+    setEditingStudentId(studentId)
+    setEditingStudentName(currentName)
+  }
+
+  const handleSaveStudentName = async () => {
+    if (!editingStudentId || !editingStudentName.trim()) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ name: editingStudentName.trim() })
+        .eq('id', editingStudentId)
+
+      if (error) throw error
+
+      // 로컬 상태 업데이트
+      setStudents(students.map(s => 
+        s.id === editingStudentId 
+          ? { ...s, name: editingStudentName.trim() }
+          : s
+      ))
+
+      // 편집 모드 종료
+      setEditingStudentId(null)
+      setEditingStudentName('')
+    } catch (err: any) {
+      console.error('학생 이름 변경 실패:', err)
+      alert(err.message || '학생 이름 변경 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleCancelStudentEdit = () => {
+    setEditingStudentId(null)
+    setEditingStudentName('')
+  }
+
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -553,7 +594,54 @@ export default function TeacherDashboard() {
                   >
                     {/* 좌측: 학생 기본 정보 */}
                     <div className="flex items-center gap-3">
-                      <h3 className="font-semibold">{student.name}</h3>
+                      {/* 학생 이름 - 편집 모드 */}
+                      {editingStudentId === student.id ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={editingStudentName}
+                            onChange={(e) => setEditingStudentName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveStudentName()
+                              } else if (e.key === 'Escape') {
+                                handleCancelStudentEdit()
+                              }
+                            }}
+                            className="h-8 w-48"
+                            autoFocus
+                            onBlur={handleSaveStudentName}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={handleSaveStudentName}
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                            onClick={handleCancelStudentEdit}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <h3 className="font-semibold">{student.name}</h3>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleEditStudentName(student.id, student.name)}
+                            title="이름 변경"
+                          >
+                            <Edit2 className="w-3 h-3 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      )}
                       <span className="text-sm text-muted-foreground">{student.email}</span>
                     </div>
 
