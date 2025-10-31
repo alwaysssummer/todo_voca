@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { BookOpen, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -13,6 +14,7 @@ export default function TeacherLoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -47,6 +49,13 @@ export default function TeacherLoginPage() {
       }
 
       // 로그인 성공 - 세션 저장
+      if (rememberMe) {
+        // 자동 로그인: localStorage에 저장 (30일 유지)
+        localStorage.setItem('teacher_id', teacher.id)
+        localStorage.setItem('teacher_name', teacher.name)
+        localStorage.setItem('teacher_login_time', Date.now().toString())
+      }
+      // sessionStorage는 항상 저장 (현재 세션용)
       sessionStorage.setItem('teacher_id', teacher.id)
       sessionStorage.setItem('teacher_name', teacher.name)
       
@@ -103,6 +112,21 @@ export default function TeacherLoginPage() {
               required
               disabled={loading}
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="remember" 
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              disabled={loading}
+            />
+            <label 
+              htmlFor="remember" 
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              로그인 상태 유지 (30일)
+            </label>
           </div>
 
           <Button 

@@ -84,9 +84,34 @@ export default function TeacherDashboard() {
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
 
   useEffect(() => {
-    // 로그인 확인
-    const teacherId = sessionStorage.getItem('teacher_id')
-    const name = sessionStorage.getItem('teacher_name')
+    // 로그인 확인 (sessionStorage 우선, 없으면 localStorage 확인)
+    let teacherId = sessionStorage.getItem('teacher_id')
+    let name = sessionStorage.getItem('teacher_name')
+    
+    // sessionStorage에 없으면 localStorage 확인 (자동 로그인)
+    if (!teacherId || !name) {
+      teacherId = localStorage.getItem('teacher_id')
+      name = localStorage.getItem('teacher_name')
+      const loginTime = localStorage.getItem('teacher_login_time')
+      
+      // localStorage 확인
+      if (teacherId && name && loginTime) {
+        // 30일 만료 체크
+        const daysPassed = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60 * 24)
+        if (daysPassed > 30) {
+          // 만료됨 - localStorage 정리 후 로그인 페이지로
+          localStorage.removeItem('teacher_id')
+          localStorage.removeItem('teacher_name')
+          localStorage.removeItem('teacher_login_time')
+          router.push('/teacher/login')
+          return
+        }
+        
+        // 유효하면 sessionStorage에도 복사 (성능 최적화)
+        sessionStorage.setItem('teacher_id', teacherId)
+        sessionStorage.setItem('teacher_name', name)
+      }
+    }
     
     if (!teacherId || !name) {
       router.push('/teacher/login')
@@ -238,8 +263,12 @@ export default function TeacherDashboard() {
   }
 
   const handleLogout = () => {
+    // sessionStorage와 localStorage 모두 정리
     sessionStorage.removeItem('teacher_id')
     sessionStorage.removeItem('teacher_name')
+    localStorage.removeItem('teacher_id')
+    localStorage.removeItem('teacher_name')
+    localStorage.removeItem('teacher_login_time')
     router.push('/teacher/login')
   }
 

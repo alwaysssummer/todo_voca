@@ -71,7 +71,7 @@ export function AddWordlistDialog({
     setError('')
 
     try {
-      const teacherId = sessionStorage.getItem('teacher_id')
+      const teacherId = sessionStorage.getItem('teacher_id') || localStorage.getItem('teacher_id')
       
       // 1. wordlist 생성
       const { data: wordlist, error: wordlistError } = await supabase

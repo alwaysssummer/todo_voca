@@ -206,7 +206,7 @@ export function MergeWordlistDialog({
       // STEP 4: 새 단어장 생성
       // ============================================
       
-      const teacherId = sessionStorage.getItem('teacher_id')
+      const teacherId = sessionStorage.getItem('teacher_id') || localStorage.getItem('teacher_id')
       
       const { data: newWordlist, error: wordlistError } = await supabase
         .from('wordlists')

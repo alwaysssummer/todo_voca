@@ -106,7 +106,7 @@ export function AssignWordlistDialog({
     setLoading(true)
 
     try {
-      const teacherId = sessionStorage.getItem('teacher_id')
+      const teacherId = sessionStorage.getItem('teacher_id') || localStorage.getItem('teacher_id')
       if (!teacherId) throw new Error('로그인이 필요합니다')
 
       // ⭐ 학생의 daily_goal 가져오기
