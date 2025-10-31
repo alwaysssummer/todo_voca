@@ -64,18 +64,19 @@ export function StudyScreen({ token }: { token: string }) {
         // 완성 단어장 데이터 저장
         setCompletedWordlistData(result.completedWordlistData)
         
-        // 세대 완료 체크
+        // 단어장 전체 완료 체크
         if (result.generationComplete) {
-          // 세대 완료 모달 데이터 저장
+          // 단어장 완료 모달 데이터 저장
           setGenerationModalData({
             currentGeneration: currentAssignment?.generation || 1,
             skippedCount: result.skippedCount || 0,
             nextGenerationCreated: result.nextGenerationCreated || false,
             perfectCompletion: result.perfectCompletion || false
           })
-          // ⭐ 세대 완료 모달은 hook에서 자동으로 표시됨 (fetchNextWord에서 처리)
+          // ⭐ 단어장 완료 시에도 일단 "목표 달성!" 모달 먼저 표시
+          setGoalModalOpen(true)
         } else {
-          // 일일 목표만 달성 - 축하 모달 표시
+          // 일일 목표만 달성 - "목표 달성!" 모달 표시
           setGoalModalOpen(true)
         }
       }
@@ -89,7 +90,12 @@ export function StudyScreen({ token }: { token: string }) {
 
   const handleGoalModalClose = () => {
     setGoalModalOpen(false)
-    // 회차 완료 후 다음 단어 로드는 handleKnow에서 처리됨
+    
+    // ⭐ 단어장 전체 완료인 경우, "단어장 학습 완료!" 모달을 이어서 표시
+    if (generationModalData) {
+      setShowGenerationCompleteModal(true)
+    }
+    // 일일 목표만 완료한 경우, 다음 단어 로드는 handleKnow에서 이미 처리됨
   }
 
   const onDontKnowClick = async () => {
@@ -187,15 +193,15 @@ export function StudyScreen({ token }: { token: string }) {
   }
 
   if (!currentWord) {
-    // ⭐ 상태 명확화: 회차 완료 vs 세대 완료 vs 로딩
+    // ⭐ 상태 명확화: 일일 목표 완료 vs 단어장 전체 완료 vs 로딩
     const isSessionComplete = progress.today >= progress.todayGoal
-    const isGenerationComplete = progress.generationCompleted >= progress.generationTotal
+    const isWordlistComplete = progress.generationCompleted >= progress.generationTotal
 
-    // ⭐⭐⭐ 학습 완료 모달이 표시 중이면 빈 화면 + 모달 표시
+    // ⭐⭐⭐ 단어장 학습 완료 모달이 표시 중이면 빈 화면 + 모달 표시
     if (showGenerationCompleteModal) {
       return (
         <div className="h-screen">
-          {/* 학습 완료 모달 */}
+          {/* 단어장 학습 완료 모달 */}
           {generationModalData && currentWordlist && (
             <GenerationCompleteModal
               open={showGenerationCompleteModal}
@@ -260,15 +266,15 @@ export function StudyScreen({ token }: { token: string }) {
       )
     }
     
-    // 2. 세대 완료 (모든 단어 완료)
-    if (isGenerationComplete) {
+    // 2. 단어장 전체 완료 (모든 단어 학습 완료)
+    if (isWordlistComplete) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="p-8 max-w-md text-center space-y-6">
             <div className="text-6xl">🎊</div>
-            <h2 className="text-2xl font-bold">세대 학습 완료!</h2>
+            <h2 className="text-2xl font-bold">단어장 학습 완료!</h2>
             <p className="text-muted-foreground">
-              {currentAssignment?.generation}차 단어장을 모두 완료했습니다
+              이 단어장의 모든 단어를 완료했습니다
             </p>
             <div className="pt-2">
               <Badge variant="outline" className="text-base px-4 py-2">
@@ -419,7 +425,7 @@ export function StudyScreen({ token }: { token: string }) {
         />
       )}
 
-      {/* 학습 완료 모달 */}
+      {/* 단어장 학습 완료 모달 */}
       {generationModalData && currentWordlist && (
         <GenerationCompleteModal
           open={showGenerationCompleteModal}

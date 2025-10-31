@@ -9,12 +9,12 @@ import { Sparkles, ArrowRight, TrendingDown, Trophy } from 'lucide-react'
 interface GenerationCompleteModalProps {
   open: boolean
   onClose: () => void
-  currentGeneration?: number  // ⭐ Optional로 변경 (세대 개념 제거)
-  totalWords: number  // ⭐ 전체 단어 수
+  currentGeneration?: number  // ⭐ Optional (사용하지 않음)
+  totalWords: number  // 전체 단어 수
   skippedCount: number  // 모르는 단어 수
-  nextGenerationCreated: boolean
-  perfectCompletion: boolean
-  studentToken?: string  // ⭐ 대시보드 이동을 위한 토큰
+  nextGenerationCreated: boolean  // 복습 단어장 생성 여부
+  perfectCompletion: boolean  // 완벽 암기 여부
+  studentToken?: string  // 대시보드 이동을 위한 토큰
 }
 
 export function GenerationCompleteModal({
@@ -29,7 +29,7 @@ export function GenerationCompleteModal({
 }: GenerationCompleteModalProps) {
   
   const handleConfirm = () => {
-    // ⭐ 학생 대시보드로 이동
+    // 학생 대시보드로 이동
     if (studentToken) {
       // 현재 URL에 /mobile/이 포함되어 있으면 모바일 대시보드로, 아니면 데스크 대시보드로
       const isMobile = window.location.pathname.includes('/mobile/')
@@ -113,7 +113,7 @@ export function GenerationCompleteModal({
 
               {nextGenerationCreated && skippedCount > 0 && (
                 <p className="text-xs text-center text-muted-foreground">
-                  모르는 단어는 강사 페이지에 새 단어장으로 저장되었습니다
+                  모르는 단어는 강사 페이지에 복습 단어장으로 저장되었습니다
                 </p>
               )}
             </>
