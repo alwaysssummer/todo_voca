@@ -18,13 +18,15 @@ import {
   XCircle,
   Edit2,
   Check,
-  X
+  X,
+  Merge
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
 import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialog'
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
+import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
 import { Input } from '@/components/ui/input'
 
 interface DashboardStats {
@@ -79,6 +81,7 @@ export default function TeacherDashboard() {
   const [editingStudentName, setEditingStudentName] = useState('')
   const [selectedWordlists, setSelectedWordlists] = useState<string[]>([])
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
 
   useEffect(() => {
     // 로그인 확인
@@ -958,16 +961,34 @@ export default function TeacherDashboard() {
                   </span>
                 </div>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  disabled={selectedWordlists.length === 0}
-                  onClick={handleDeleteSelectedWordlists}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  선택 삭제
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={selectedWordlists.length < 2}
+                    onClick={() => setMergeDialogOpen(true)}
+                  >
+                    <Merge className="w-4 h-4" />
+                    통합하기
+                    {selectedWordlists.length >= 2 && (
+                      <Badge variant="secondary" className="ml-1">
+                        {selectedWordlists.length}
+                      </Badge>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    disabled={selectedWordlists.length === 0}
+                    onClick={handleDeleteSelectedWordlists}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    선택 삭제
+                  </Button>
+                </div>
               </div>
             )}
           </CardHeader>
@@ -1111,6 +1132,18 @@ export default function TeacherDashboard() {
         open={addWordlistOpen}
         onClose={() => setAddWordlistOpen(false)}
         onSuccess={loadDashboardData}
+      />
+
+      {/* 단어장 통합 다이얼로그 */}
+      <MergeWordlistDialog
+        open={mergeDialogOpen}
+        onClose={() => setMergeDialogOpen(false)}
+        wordlistIds={selectedWordlists}
+        onSuccess={() => {
+          setMergeDialogOpen(false)
+          setSelectedWordlists([])
+          loadDashboardData()
+        }}
       />
 
       {/* 단어장 보기 다이얼로그 */}
