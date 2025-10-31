@@ -78,6 +78,7 @@ export default function TeacherDashboard() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
   const [editingStudentName, setEditingStudentName] = useState('')
   const [selectedWordlists, setSelectedWordlists] = useState<string[]>([])
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([])
 
   useEffect(() => {
     // 로그인 확인
@@ -456,6 +457,104 @@ export default function TeacherDashboard() {
     setEditingStudentName('')
   }
 
+  // 학생 체크박스 토글
+  const toggleStudentSelection = (studentId: string) => {
+    setSelectedStudents(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    )
+  }
+
+  // 학생 전체 선택/해제 토글
+  const toggleSelectAllStudents = () => {
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([])
+    } else {
+      setSelectedStudents(filteredStudents.map(s => s.id))
+    }
+  }
+
+  // 선택된 학생 일괄 삭제
+  const handleDeleteSelectedStudents = async () => {
+    if (selectedStudents.length === 0) return
+
+    // 선택된 학생 정보 가져오기
+    const selectedItems = students.filter(s => selectedStudents.includes(s.id))
+    
+    // 확인 메시지
+    const studentNames = selectedItems.map(s => s.name).join(', ')
+    const confirmMessage = `선택한 ${selectedStudents.length}명의 학생을 삭제하시겠습니까?\n\n학생: ${studentNames}\n\n⚠️ 학생들의 모든 학습 기록이 삭제됩니다.`
+    
+    if (!confirm(confirmMessage)) return
+
+    // 2차 확인
+    const secondConfirm = confirm(
+      `최종 확인: ${selectedStudents.length}명의 학생과\n모든 학습 기록을 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!`
+    )
+    if (!secondConfirm) return
+
+    try {
+      // 각 학생 삭제 (관련 데이터 CASCADE 삭제)
+      for (const studentId of selectedStudents) {
+        // 1. online_tests 삭제
+        const { error: testsError } = await supabase
+          .from('online_tests')
+          .delete()
+          .eq('student_id', studentId)
+
+        if (testsError) throw testsError
+
+        // 2. offline_tests 삭제
+        const { error: offlineError } = await supabase
+          .from('offline_tests')
+          .delete()
+          .eq('student_id', studentId)
+
+        if (offlineError) throw offlineError
+
+        // 3. completed_wordlists 삭제
+        const { error: completedError } = await supabase
+          .from('completed_wordlists')
+          .delete()
+          .eq('student_id', studentId)
+
+        if (completedError) throw completedError
+
+        // 4. student_word_progress 삭제
+        const { error: progressError } = await supabase
+          .from('student_word_progress')
+          .delete()
+          .eq('student_id', studentId)
+
+        if (progressError) throw progressError
+
+        // 5. student_wordlists 삭제
+        const { error: wordlistsError } = await supabase
+          .from('student_wordlists')
+          .delete()
+          .eq('student_id', studentId)
+
+        if (wordlistsError) throw wordlistsError
+
+        // 6. users 삭제
+        const { error: userError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', studentId)
+
+        if (userError) throw userError
+      }
+
+      alert(`${selectedStudents.length}명의 학생이 삭제되었습니다.`)
+      setSelectedStudents([])
+      loadDashboardData()
+    } catch (err: any) {
+      console.error('학생 일괄 삭제 실패:', err)
+      alert(err.message || '학생 삭제 중 오류가 발생했습니다.')
+    }
+  }
+
   // 단어장 체크박스 토글
   const toggleWordlistSelection = (wordlistId: string) => {
     setSelectedWordlists(prev => 
@@ -639,13 +738,45 @@ export default function TeacherDashboard() {
                 학생 추가
               </Button>
             </div>
+            
             {students.length > 0 && (
-              <Input
-                placeholder="학생 이름으로 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-sm"
-              />
+              <>
+                <Input
+                  placeholder="학생 이름으로 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-sm mb-3"
+                />
+                
+                {/* 전체 선택 + 선택 삭제 버튼 */}
+                <div className="flex items-center justify-between gap-2 pb-3 border-b">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                      onCheckedChange={toggleSelectAllStudents}
+                    />
+                    <span className="text-sm font-medium text-muted-foreground">
+                      전체 선택
+                      {selectedStudents.length > 0 && (
+                        <span className="ml-1 text-blue-600 font-semibold">
+                          ({selectedStudents.length}/{filteredStudents.length})
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    disabled={selectedStudents.length === 0}
+                    onClick={handleDeleteSelectedStudents}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    선택 삭제
+                  </Button>
+                </div>
+              </>
             )}
           </CardHeader>
           <CardContent>
@@ -666,6 +797,12 @@ export default function TeacherDashboard() {
                   >
                     {/* 좌측: 학생 기본 정보 */}
                     <div className="flex items-center gap-3">
+                      {/* 체크박스 */}
+                      <Checkbox
+                        checked={selectedStudents.includes(student.id)}
+                        onCheckedChange={() => toggleStudentSelection(student.id)}
+                      />
+                      
                       {/* 학생 이름 - 편집 모드 */}
                       {editingStudentId === student.id ? (
                         <div className="flex items-center gap-2">
