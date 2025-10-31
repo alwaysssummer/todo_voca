@@ -104,7 +104,7 @@ export function GenerationCompleteModal({
 
   return (
     <Dialog open={open}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden overflow-hidden relative">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto [&>button]:hidden relative">
         {/* 폭죽 효과 */}
         {confetti.map((item) => (
           <div
@@ -121,7 +121,7 @@ export function GenerationCompleteModal({
           </div>
         ))}
         
-        <DialogHeader>
+        <DialogHeader className="sticky top-0 bg-white dark:bg-gray-950 z-10 pb-4">
           <DialogTitle className="text-center text-2xl flex items-center justify-center gap-2">
             {perfectCompletion ? (
               <>
