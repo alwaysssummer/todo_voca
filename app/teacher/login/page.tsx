@@ -49,15 +49,27 @@ export default function TeacherLoginPage() {
       }
 
       // 로그인 성공 - 세션 저장
+      console.log('✅ [Login] 로그인 성공:', { teacherId: teacher.id, teacherName: teacher.name, rememberMe })
+      
       if (rememberMe) {
         // 자동 로그인: localStorage에 저장 (30일 유지)
+        const loginTime = Date.now().toString()
         localStorage.setItem('teacher_id', teacher.id)
         localStorage.setItem('teacher_name', teacher.name)
-        localStorage.setItem('teacher_login_time', Date.now().toString())
+        localStorage.setItem('teacher_login_time', loginTime)
+        console.log('💾 [Login] localStorage 저장 완료:', {
+          teacher_id: teacher.id,
+          teacher_name: teacher.name,
+          teacher_login_time: loginTime
+        })
+      } else {
+        console.log('⚠️ [Login] Remember Me 체크 안됨, localStorage 저장 안함')
       }
+      
       // sessionStorage는 항상 저장 (현재 세션용)
       sessionStorage.setItem('teacher_id', teacher.id)
       sessionStorage.setItem('teacher_name', teacher.name)
+      console.log('📦 [Login] sessionStorage 저장 완료')
       
       router.push('/teacher/dashboard')
     } catch (err) {
