@@ -103,8 +103,16 @@ export function GenerationCompleteModal({
   }
 
   return (
-    <Dialog open={open}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto [&>button]:hidden relative">
+    <Dialog open={open} modal={true}>
+      <DialogContent 
+        className="sm:max-w-md [&>button]:hidden relative
+                   max-sm:h-auto max-sm:max-h-[85vh] max-sm:w-[90vw]
+                   max-sm:fixed max-sm:top-[50%] max-sm:left-[50%] 
+                   max-sm:translate-x-[-50%] max-sm:translate-y-[-50%]
+                   overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         {/* 폭죽 효과 */}
         {confetti.map((item) => (
           <div
