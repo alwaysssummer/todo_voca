@@ -354,7 +354,7 @@ export function useStudySession(token: string) {
               setIsGeneratingReview(true)
               
               // ⭐⭐⭐ 복습 단어장 이름으로 중복 체크 (2중 방어 1단계)
-              const reviewWordlistName = `${student.name} - ${currentWordlist.name} 복습 (${skippedWords.length}개)`
+              const reviewWordlistName = `${currentWordlist.name}-${student.name}`
               const { data: existingWordlist } = await supabase
                 .from('wordlists')
                 .select('id, name')
