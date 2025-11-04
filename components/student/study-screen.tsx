@@ -575,53 +575,104 @@ export function StudyScreen({ token }: { token: string }) {
         />
       )}
 
-      {/* "모른다" 강조 화면 - Option 4 V1 + Phase 1-5: 일시정지 기능 */}
+      {/* "모른다" 강조 화면 - 동적 글자 크기 + 최종 미니멀 버전 */}
       {showDontKnowScreen && dontKnowWord && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4"
         >
           <Card 
-            className="max-w-2xl w-full mx-4 border-4 border-red-500 shadow-2xl cursor-pointer"
+            className="max-w-2xl w-full border-4 border-red-500 shadow-2xl cursor-pointer 
+                       max-h-[90vh] overflow-y-auto"
             onClick={togglePause}
           >
-            <CardContent className="p-12 text-center space-y-6">
-              {/* 단어 (초대형) */}
-              <div className="text-6xl font-bold text-gray-900">
+            <CardContent className="p-6 sm:p-12 text-center space-y-4 sm:space-y-6">
+              {/* 단어 (동적 크기 조정) */}
+              <div 
+                className={`font-bold text-gray-900 break-words ${
+                  dontKnowWord.word_text.length <= 6 
+                    ? 'text-5xl sm:text-6xl md:text-7xl'  // 짧은 단어 (예: apple)
+                    : dontKnowWord.word_text.length <= 12
+                    ? 'text-4xl sm:text-5xl md:text-6xl'  // 중간 단어 (예: individual)
+                    : dontKnowWord.word_text.length <= 18
+                    ? 'text-3xl sm:text-4xl md:text-5xl'  // 긴 단어 (예: accommodation)
+                    : 'text-2xl sm:text-3xl md:text-4xl'  // 매우 긴 단어
+                }`}
+              >
                 {dontKnowWord.word_text}
               </div>
               
-              {/* 뜻 (대형, 빨간색) */}
-              <div className="text-4xl text-red-600 font-semibold">
+              {/* 뜻 (동적 크기 조정) */}
+              <div 
+                className={`text-red-600 font-semibold break-words ${
+                  dontKnowWord.meaning.length <= 10
+                    ? 'text-2xl sm:text-3xl md:text-4xl'  // 짧은 뜻 (예: 사과)
+                    : dontKnowWord.meaning.length <= 20
+                    ? 'text-xl sm:text-2xl md:text-3xl'   // 중간 뜻 (예: 개인, 개인의, 개인적인)
+                    : dontKnowWord.meaning.length <= 30
+                    ? 'text-lg sm:text-xl md:text-2xl'    // 긴 뜻
+                    : 'text-base sm:text-lg md:text-xl'   // 매우 긴 뜻
+                }`}
+              >
                 {dontKnowWord.meaning}
               </div>
               
-              {/* 연상암기 (있으면 표시) */}
+              {/* 연상암기 - 어원/연상 구분 (심플 회색 버전) */}
               {dontKnowWord.mnemonic && (
-                <div className="pt-4 border-t-2 border-gray-200">
-                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <span className="text-2xl">🧠</span>
-                      <p className="text-lg text-blue-800 dark:text-blue-200 flex-1">
+                <div className="pt-3 border-t-2 border-gray-200 space-y-2">
+                  {/* 어원 - 회색 박스 */}
+                  {dontKnowWord.mnemonic.includes('어원:') && (
+                    <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-700">
+                      <p 
+                        className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed break-words text-left"
+                        dangerouslySetInnerHTML={{
+                          __html: dontKnowWord.mnemonic
+                            .split('연상:')[0]
+                            .replace('어원:', '')
+                            .trim()
+                            // 괄호 앞 단어를 굵게
+                            .replace(/([a-zA-Z가-힣]+)\(/g, '<strong>$1</strong>(')
+                            // 작은따옴표 안 단어를 굵게
+                            .replace(/'([^']+)'/g, '<strong>\'$1\'</strong>')
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* 연상 - 회색 박스 */}
+                  {dontKnowWord.mnemonic.includes('연상:') && (
+                    <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-700">
+                      <p 
+                        className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed break-words text-left"
+                        dangerouslySetInnerHTML={{
+                          __html: (dontKnowWord.mnemonic.split('연상:')[1]?.trim() || dontKnowWord.mnemonic)
+                            // 작은따옴표 안 단어를 굵게
+                            .replace(/'([^']+)'/g, '<strong>\'$1\'</strong>')
+                            // 괄호 앞 단어를 굵게
+                            .replace(/([a-zA-Z가-힣]+)\(/g, '<strong>$1</strong>(')
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* 구분 없는 경우 (기존 단어장 호환) */}
+                  {!dontKnowWord.mnemonic.includes('어원:') && !dontKnowWord.mnemonic.includes('연상:') && (
+                    <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-700">
+                      <p className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed break-words text-left">
                         {dontKnowWord.mnemonic}
                       </p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
               
-              {/* 🆕 Phase 1-5: 일시정지 안내 */}
+              {/* 일시정지 표시 (간단하게) */}
               {isPaused && (
-                <div className="text-sm text-blue-600 font-semibold animate-pulse">
-                  ⏸️ 일시정지 (화면을 다시 터치하여 계속)
+                <div className="text-base sm:text-lg text-gray-600 font-semibold py-2">
+                  ⏸️ 일시정지
                 </div>
               )}
               
-              {/* 카운트다운 */}
-              <div className="text-2xl text-gray-500 font-mono">
-                {dontKnowCountdown}
-              </div>
-              
-              {/* 프로그레스 바 */}
+              {/* 프로그레스 바만 표시 (숫자 제거) */}
               <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                 <div 
                   className="bg-red-500 h-full transition-all"
@@ -631,11 +682,6 @@ export function StudyScreen({ token }: { token: string }) {
                     transitionTimingFunction: 'linear'
                   }}
                 />
-              </div>
-              
-              {/* 🆕 Phase 1-5: 안내 텍스트 */}
-              <div className="text-xs text-gray-400 mt-4">
-                {isPaused ? '화면을 터치하여 계속' : '화면을 터치하여 일시정지'}
               </div>
             </CardContent>
           </Card>
