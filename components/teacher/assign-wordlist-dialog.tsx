@@ -53,11 +53,11 @@ export function AssignWordlistDialog({
 
   const loadWordlists = async () => {
     try {
-      // 모든 단어장 가져오기
+      // 모든 단어장 가져오기 (display_order로 정렬)
       const { data: allWordlists, error: wordlistsError } = await supabase
         .from('wordlists')
         .select('id, name, total_words')
-        .order('created_at', { ascending: false })
+        .order('display_order', { ascending: true })
 
       if (wordlistsError) throw wordlistsError
 

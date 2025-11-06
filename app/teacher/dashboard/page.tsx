@@ -19,7 +19,8 @@ import {
   Edit2,
   Check,
   X,
-  Merge
+  Merge,
+  GripVertical
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
@@ -28,6 +29,23 @@ import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
 import { Input } from '@/components/ui/input'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface DashboardStats {
   totalStudents: number
@@ -46,6 +64,7 @@ interface Student {
   oTestCompleted: number       // O-TEST 완료 회차
   xTestCompleted: number       // X-TEST 완료 회차
   accessToken: string
+  displayOrder: number         // 표시 순서
 }
 
 interface Wordlist {
@@ -53,6 +72,79 @@ interface Wordlist {
   title: string
   totalWords: number
   assignedStudents: number
+  displayOrder: number         // 표시 순서
+}
+
+// Sortable Student Item 컴포넌트
+function SortableStudentItem({ student, children }: { student: Student; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: student.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2"
+    >
+      {/* 드래그 핸들 */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-accent rounded"
+      >
+        <GripVertical className="w-5 h-5 text-muted-foreground" />
+      </div>
+      {children}
+    </div>
+  )
+}
+
+// Sortable Wordlist Item 컴포넌트
+function SortableWordlistItem({ wordlist, children }: { wordlist: Wordlist; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: wordlist.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2"
+    >
+      {/* 드래그 핸들 */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-accent rounded"
+      >
+        <GripVertical className="w-5 h-5 text-muted-foreground" />
+      </div>
+      {children}
+    </div>
+  )
 }
 
 export default function TeacherDashboard() {
@@ -138,11 +230,12 @@ export default function TeacherDashboard() {
 
   const loadDashboardData = async () => {
     try {
-      // 학생 데이터 가져오기
+      // 학생 데이터 가져오기 (display_order로 정렬)
       const { data: studentsData, error: studentsError } = await supabase
         .from('users')
-        .select('id, name, email, access_token, daily_goal')
+        .select('id, name, email, access_token, daily_goal, display_order')
         .eq('role', 'student')
+        .order('display_order', { ascending: true })
 
       if (studentsError) throw studentsError
 
@@ -224,17 +317,19 @@ export default function TeacherDashboard() {
             totalSessions: totalSessions,
             oTestCompleted: oTestCompleted || 0,
             xTestCompleted: xTestCompleted,
-            accessToken: student.access_token
+            accessToken: student.access_token,
+            displayOrder: student.display_order || 0
           }
         })
       )
 
       setStudents(studentsWithProgress)
 
-      // 단어장 데이터 가져오기
+      // 단어장 데이터 가져오기 (display_order로 정렬)
       const { data: wordlistsData, error: wordlistsError } = await supabase
         .from('wordlists')
-        .select('id, name, total_words')
+        .select('id, name, total_words, display_order')
+        .order('display_order', { ascending: true })
 
       if (wordlistsError) throw wordlistsError
 
@@ -249,7 +344,8 @@ export default function TeacherDashboard() {
             id: wordlist.id,
             title: wordlist.name,
             totalWords: wordlist.total_words,
-            assignedStudents: assignedCount || 0
+            assignedStudents: assignedCount || 0,
+            displayOrder: wordlist.display_order || 0
           }
         })
       )
@@ -675,6 +771,105 @@ export default function TeacherDashboard() {
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // 드래그 앤 드롭 센서 설정
+  const studentSensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const wordlistSensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // 학생 드래그 종료 핸들러
+  const handleStudentDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = students.findIndex((s) => s.id === active.id)
+    const newIndex = students.findIndex((s) => s.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // 로컬 상태 업데이트
+    const newStudents = arrayMove(students, oldIndex, newIndex)
+    setStudents(newStudents)
+
+    // DB 업데이트 (순서 저장)
+    try {
+      const updates = newStudents.map((student, index) => ({
+        id: student.id,
+        display_order: index
+      }))
+
+      for (const update of updates) {
+        await supabase
+          .from('users')
+          .update({ display_order: update.display_order })
+          .eq('id', update.id)
+      }
+
+      console.log('✅ 학생 순서 저장 완료')
+    } catch (error) {
+      console.error('❌ 학생 순서 저장 실패:', error)
+      alert('순서 저장에 실패했습니다.')
+      // 실패 시 다시 로드
+      loadDashboardData()
+    }
+  }
+
+  // 단어장 드래그 종료 핸들러
+  const handleWordlistDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = wordlists.findIndex((w) => w.id === active.id)
+    const newIndex = wordlists.findIndex((w) => w.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // 로컬 상태 업데이트
+    const newWordlists = arrayMove(wordlists, oldIndex, newIndex)
+    setWordlists(newWordlists)
+
+    // DB 업데이트 (순서 저장)
+    try {
+      const updates = newWordlists.map((wordlist, index) => ({
+        id: wordlist.id,
+        display_order: index
+      }))
+
+      for (const update of updates) {
+        await supabase
+          .from('wordlists')
+          .update({ display_order: update.display_order })
+          .eq('id', update.id)
+      }
+
+      console.log('✅ 단어장 순서 저장 완료')
+    } catch (error) {
+      console.error('❌ 단어장 순서 저장 실패:', error)
+      alert('순서 저장에 실패했습니다.')
+      // 실패 시 다시 로드
+      loadDashboardData()
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -835,138 +1030,148 @@ export default function TeacherDashboard() {
                 검색 결과가 없습니다
               </div>
             ) : (
-              <div className="space-y-2">
-                {filteredStudents.map((student) => (
-                  <div 
-                    key={student.id} 
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
-                  >
-                    {/* 좌측: 학생 기본 정보 */}
-                    <div className="flex items-center gap-3">
-                      {/* 체크박스 */}
-                      <Checkbox
-                        checked={selectedStudents.includes(student.id)}
-                        onCheckedChange={() => toggleStudentSelection(student.id)}
-                      />
-                      
-                      {/* 학생 이름 - 편집 모드 */}
-                      {editingStudentId === student.id ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={editingStudentName}
-                            onChange={(e) => setEditingStudentName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveStudentName()
-                              } else if (e.key === 'Escape') {
-                                handleCancelStudentEdit()
-                              }
-                            }}
-                            className="h-8 w-48"
-                            autoFocus
-                            onBlur={handleSaveStudentName}
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={handleSaveStudentName}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                            onClick={handleCancelStudentEdit}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 group">
-                          <h3 className="font-semibold">{student.name}</h3>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleEditStudentName(student.id, student.name)}
-                            title="이름 변경"
-                          >
-                            <Edit2 className="w-3 h-3 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      )}
-                      <span className="text-sm text-muted-foreground">{student.email}</span>
-                    </div>
+              <DndContext
+                sensors={studentSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleStudentDragEnd}
+              >
+                <SortableContext
+                  items={filteredStudents.map(s => s.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {filteredStudents.map((student) => (
+                      <SortableStudentItem key={student.id} student={student}>
+                        <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors flex-1">
+                          {/* 좌측: 학생 기본 정보 */}
+                          <div className="flex items-center gap-3">
+                            {/* 체크박스 */}
+                            <Checkbox
+                              checked={selectedStudents.includes(student.id)}
+                              onCheckedChange={() => toggleStudentSelection(student.id)}
+                            />
+                            
+                            {/* 학생 이름 - 편집 모드 */}
+                            {editingStudentId === student.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editingStudentName}
+                                  onChange={(e) => setEditingStudentName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveStudentName()
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelStudentEdit()
+                                    }
+                                  }}
+                                  className="h-8 w-48"
+                                  autoFocus
+                                  onBlur={handleSaveStudentName}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  onClick={handleSaveStudentName}
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                                  onClick={handleCancelStudentEdit}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group">
+                                <h3 className="font-semibold">{student.name}</h3>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleEditStudentName(student.id, student.name)}
+                                  title="이름 변경"
+                                >
+                                  <Edit2 className="w-3 h-3 text-muted-foreground" />
+                                </Button>
+                              </div>
+                            )}
+                            <span className="text-sm text-muted-foreground">{student.email}</span>
+                          </div>
 
-                    {/* 우측: 진행 상황 + 버튼 */}
-                    <div className="flex items-center gap-3">
-                      {/* 학습 진행 통계 */}
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          {student.completedSessions}/{student.totalSessions}
-                        </Badge>
-                        
-                        <Badge variant="outline" className="gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          {student.oTestCompleted}/{student.completedSessions}
-                        </Badge>
-                        
-                        <Badge variant="outline" className="gap-1">
-                          <XCircle className="w-3 h-3" />
-                          {student.xTestCompleted}/{student.completedSessions}
-                        </Badge>
-                        
-                        <span className="text-sm font-medium">{student.progress}%</span>
-                      </div>
+                          {/* 우측: 진행 상황 + 버튼 */}
+                          <div className="flex items-center gap-3">
+                            {/* 학습 진행 통계 */}
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="gap-1">
+                                <BookOpen className="w-3 h-3" />
+                                {student.completedSessions}/{student.totalSessions}
+                              </Badge>
+                              
+                              <Badge variant="outline" className="gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {student.oTestCompleted}/{student.completedSessions}
+                              </Badge>
+                              
+                              <Badge variant="outline" className="gap-1">
+                                <XCircle className="w-3 h-3" />
+                                {student.xTestCompleted}/{student.completedSessions}
+                              </Badge>
+                              
+                              <span className="text-sm font-medium">{student.progress}%</span>
+                            </div>
 
-                      {/* 액션 버튼 */}
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openAssignDialog(student.id, student.name)}
-                          className="gap-2"
-                        >
-                          <BookOpen className="w-3 h-3" />
-                          단어장
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openStudentDashboard(student.accessToken)}
-                          className="gap-2"
-                        >
-                          <Eye className="w-3 h-3" />
-                          DESK
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
-                            window.open(link, '_blank')
-                          }}
-                          className="gap-2"
-                        >
-                          <Eye className="w-3 h-3" />
-                          MOBILE
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteStudent(student.id, student.name)}
-                          className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
+                            {/* 액션 버튼 */}
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openAssignDialog(student.id, student.name)}
+                                className="gap-2"
+                              >
+                                <BookOpen className="w-3 h-3" />
+                                단어장
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openStudentDashboard(student.accessToken)}
+                                className="gap-2"
+                              >
+                                <Eye className="w-3 h-3" />
+                                DESK
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
+                                  window.open(link, '_blank')
+                                }}
+                                className="gap-2"
+                              >
+                                <Eye className="w-3 h-3" />
+                                MOBILE
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteStudent(student.id, student.name)}
+                                className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </SortableStudentItem>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
@@ -1041,114 +1246,124 @@ export default function TeacherDashboard() {
                 등록된 단어장이 없습니다
               </div>
             ) : (
-              <div className="space-y-2">
-                {wordlists.map((wordlist) => (
-                  <div 
-                    key={wordlist.id} 
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
-                      {/* 체크박스 */}
-                      <Checkbox
-                        checked={selectedWordlists.includes(wordlist.id)}
-                        onCheckedChange={() => toggleWordlistSelection(wordlist.id)}
-                      />
-                      
-                      {/* 단어장 이름 - 편집 모드 */}
-                      {editingWordlistId === wordlist.id ? (
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={editingWordlistName}
-                            onChange={(e) => setEditingWordlistName(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveWordlistName()
-                              } else if (e.key === 'Escape') {
-                                handleCancelEdit()
+              <DndContext
+                sensors={wordlistSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleWordlistDragEnd}
+              >
+                <SortableContext
+                  items={wordlists.map(w => w.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {wordlists.map((wordlist) => (
+                      <SortableWordlistItem key={wordlist.id} wordlist={wordlist}>
+                        <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors flex-1">
+                          <div className="flex items-center gap-4 flex-1">
+                            {/* 체크박스 */}
+                            <Checkbox
+                              checked={selectedWordlists.includes(wordlist.id)}
+                              onCheckedChange={() => toggleWordlistSelection(wordlist.id)}
+                            />
+                            
+                            {/* 단어장 이름 - 편집 모드 */}
+                            {editingWordlistId === wordlist.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  value={editingWordlistName}
+                                  onChange={(e) => setEditingWordlistName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveWordlistName()
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelEdit()
+                                    }
+                                  }}
+                                  className="h-8 w-64"
+                                  autoFocus
+                                  onBlur={handleSaveWordlistName}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  onClick={handleSaveWordlistName}
+                                >
+                                  <Check className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
+                                  onClick={handleCancelEdit}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 group">
+                                <h3 className="font-semibold">{wordlist.title}</h3>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => handleEditWordlistName(wordlist.id, wordlist.title)}
+                                  title="이름 변경"
+                                >
+                                  <Edit2 className="w-3 h-3 text-muted-foreground" />
+                                </Button>
+                              </div>
+                            )}
+                            
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <BookOpen className="w-3 h-3" />
+                                {wordlist.totalWords}개 단어
+                              </span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {wordlist.assignedStudents}명 배정
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="gap-2"
+                              onClick={() => {
+                                setSelectedWordlist(wordlist)
+                                setViewWordlistOpen(true)
+                              }}
+                            >
+                              <Eye className="w-3 h-3" />
+                              DESK
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteWordlist(wordlist.id, wordlist.title)}
+                              className={`gap-2 ${
+                                wordlist.assignedStudents > 0 
+                                  ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50' 
+                                  : 'text-red-600 hover:text-red-700 hover:bg-red-50'
+                              }`}
+                              title={
+                                wordlist.assignedStudents > 0 
+                                  ? `⚠️ ${wordlist.assignedStudents}명에게 배정됨 (학습 기록 삭제됨)` 
+                                  : '단어장 삭제'
                               }
-                            }}
-                            className="h-8 w-64"
-                            autoFocus
-                            onBlur={handleSaveWordlistName}
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={handleSaveWordlistName}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                            onClick={handleCancelEdit}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2 group">
-                          <h3 className="font-semibold">{wordlist.title}</h3>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => handleEditWordlistName(wordlist.id, wordlist.title)}
-                            title="이름 변경"
-                          >
-                            <Edit2 className="w-3 h-3 text-muted-foreground" />
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          {wordlist.totalWords}개 단어
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3 h-3" />
-                          {wordlist.assignedStudents}명 배정
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="gap-2"
-                        onClick={() => {
-                          setSelectedWordlist(wordlist)
-                          setViewWordlistOpen(true)
-                        }}
-                      >
-                        <Eye className="w-3 h-3" />
-                        DESK
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDeleteWordlist(wordlist.id, wordlist.title)}
-                        className={`gap-2 ${
-                          wordlist.assignedStudents > 0 
-                            ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50' 
-                            : 'text-red-600 hover:text-red-700 hover:bg-red-50'
-                        }`}
-                        title={
-                          wordlist.assignedStudents > 0 
-                            ? `⚠️ ${wordlist.assignedStudents}명에게 배정됨 (학습 기록 삭제됨)` 
-                            : '단어장 삭제'
-                        }
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+                      </SortableWordlistItem>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
