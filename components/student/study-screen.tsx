@@ -496,9 +496,9 @@ export function StudyScreen({ token }: { token: string }) {
       </div>
 
       {/* 완료 목록 - 버튼 아래 여백 확보 */}
-      <section className="flex-1 border-t bg-muted/10 mt-auto pt-20">
+      <section className="flex-1 border-t bg-muted/10 mt-auto pt-24">
         <div className="p-3">
-          <ScrollArea className="h-[calc(50vh-9rem)]">
+          <ScrollArea className="h-[calc(50vh-10rem)]">
             <div className="space-y-1">
               {completedWords.length === 0 ? (
                 <Card className="p-6 text-center">
