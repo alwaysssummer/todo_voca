@@ -17,7 +17,9 @@ import {
   Calendar,
   Play,
   Award,
-  Printer
+  Printer,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
@@ -33,6 +35,13 @@ interface StudentDashboardProps {
 export function StudentDashboard({ token }: StudentDashboardProps) {
   const router = useRouter()
   const { data, loading, error } = useStudentDashboard(token)
+  
+  // 보기 모드 state (전체/주간/월간)
+  const [viewMode, setViewMode] = useState<'all' | 'week' | 'month'>('all')
+  
+  // 주간/월간 이동 offset
+  const [weekOffset, setWeekOffset] = useState(0) // 0 = 이번주, -1 = 이전주, +1 = 다음주
+  const [monthOffset, setMonthOffset] = useState(0) // 0 = 이번달, -1 = 이전달, +1 = 다음달
   
   // 모르는 단어 모달 state
   const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
@@ -166,7 +175,74 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   const { student, currentAssignment, completedSessions } = data
   
-  // 전체 선택/해제 토글
+  // 날짜별로 세션 그룹핑
+  const getSessionsByDate = () => {
+    const sessionsByDate: Record<string, typeof completedSessions> = {}
+    
+    completedSessions.forEach(session => {
+      const date = new Date(session.completed_date)
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      
+      if (!sessionsByDate[dateKey]) {
+        sessionsByDate[dateKey] = []
+      }
+      sessionsByDate[dateKey].push(session)
+    })
+    
+    return sessionsByDate
+  }
+  
+  // 주간 날짜 배열 생성 (월~일)
+  const getWeekDays = () => {
+    const days = []
+    const today = new Date()
+    const dayOfWeek = today.getDay() // 0(일) ~ 6(토)
+    const monday = new Date(today)
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)) // 이번주 월요일
+    
+    // weekOffset 적용 (이전주/다음주 이동)
+    monday.setDate(monday.getDate() + (weekOffset * 7))
+    
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(monday)
+      day.setDate(monday.getDate() + i)
+      days.push(day)
+    }
+    
+    return days
+  }
+  
+  // 월간 달력 배열 생성
+  const getMonthCalendar = () => {
+    const today = new Date()
+    const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
+    const year = targetDate.getFullYear()
+    const month = targetDate.getMonth()
+    
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const firstDayOfWeek = firstDay.getDay() // 0(일) ~ 6(토)
+    
+    const calendar = []
+    
+    // 빈칸 추가 (이전 달)
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      calendar.push(null)
+    }
+    
+    // 날짜 추가
+    for (let date = 1; date <= lastDay.getDate(); date++) {
+      calendar.push(new Date(year, month, date))
+    }
+    
+    return { calendar, year, month: month + 1 }
+  }
+  
+  const sessionsByDate = getSessionsByDate()
+  const weekDays = getWeekDays()
+  const monthCalendar = getMonthCalendar()
+  
+  // 전체 선택/해제 토글 (모든 세션 대상)
   const toggleSelectAll = () => {
     if (selectedSessionsForExam.length === completedSessions.length) {
       // 전체 선택 상태 → 전체 해제
@@ -250,9 +326,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               </div>
             ) : (
               <div className="space-y-2">
-                {/* 전체 선택 + 출력 버튼들 */}
+                {/* 전체 선택 + 보기 모드 + 출력 버튼들 */}
                 <div className="flex items-center justify-between gap-2 pb-3 border-b flex-wrap">
-                  {/* 왼쪽: 전체 선택 */}
+                  {/* 왼쪽: 전체 선택 + 보기 모드 */}
                   <div className="flex items-center gap-2">
                     <Checkbox
                       checked={isAllSelected}
@@ -264,6 +340,34 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                         ({selectedSessionsForExam.length}/{completedSessions.length})
                       </span>
                     </span>
+                    
+                    {/* 보기 모드 토글 */}
+                    <div className="flex items-center gap-1 ml-4 border-l pl-4">
+                      <Button
+                        variant={viewMode === 'all' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('all')}
+                        className="h-8 px-3"
+                      >
+                        A
+                      </Button>
+                      <Button
+                        variant={viewMode === 'week' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('week')}
+                        className="h-8 px-3"
+                      >
+                        W
+                      </Button>
+                      <Button
+                        variant={viewMode === 'month' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('month')}
+                        className="h-8 px-3"
+                      >
+                        M
+                      </Button>
+                    </div>
                   </div>
                   
                   {/* 오른쪽: 출력 버튼들 */}
@@ -320,8 +424,8 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                   </div>
                 </div>
 
-                {/* 회차 목록 */}
-                {completedSessions.map((session) => {
+                {/* 전체 보기 - 회차 목록 */}
+                {viewMode === 'all' && completedSessions.map((session) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
                   
@@ -472,6 +576,136 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                     </Card>
                   )
                 })}
+
+                {/* 주간 보기 */}
+                {viewMode === 'week' && (
+                  <div>
+                    {/* 주간 네비게이션 */}
+                    <div className="flex justify-between items-center mb-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setWeekOffset(weekOffset - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        이전주
+                      </Button>
+                      <div className="font-semibold">
+                        {weekDays[0]?.getMonth() + 1}월 {weekDays[0]?.getDate()}일 - {weekDays[6]?.getMonth() + 1}월 {weekDays[6]?.getDate()}일
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setWeekOffset(weekOffset + 1)}
+                      >
+                        다음주
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-7 gap-2">
+                    {weekDays.map((day, index) => {
+                      const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+                      const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+                      const sessions = sessionsByDate[dateKey] || []
+                      
+                      return (
+                        <Card key={index} className="min-h-[120px]">
+                          <CardContent className="p-2">
+                            {/* 헤더: 요일 + 날짜 */}
+                            <div className="text-center font-bold text-sm mb-2 pb-1 border-b">
+                              <div>{dayNames[day.getDay()]}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {day.getMonth() + 1}/{day.getDate()}
+                              </div>
+                            </div>
+                            
+                            {/* 회차 리스트 */}
+                            <div className="space-y-1">
+                              {sessions.length > 0 ? (
+                                sessions
+                                  .sort((a, b) => a.session_number - b.session_number)
+                                  .map(session => (
+                                    <div key={session.id} className="text-xs">
+                                      {session.session_number}회 {session.x_test_correct}/{session.x_test_total}
+                                    </div>
+                                  ))
+                              ) : (
+                                <div className="text-center text-gray-300 text-sm">-</div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 월간 보기 */}
+                {viewMode === 'month' && (
+                  <div>
+                    {/* 월간 네비게이션 */}
+                    <div className="flex justify-between items-center mb-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMonthOffset(monthOffset - 1)}
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        이전달
+                      </Button>
+                      <div className="font-bold text-lg">
+                        {monthCalendar.year}년 {monthCalendar.month}월
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setMonthOffset(monthOffset + 1)}
+                      >
+                        다음달
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                    
+                    {/* 달력 그리드 */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {/* 요일 헤더 */}
+                      {['일', '월', '화', '수', '목', '금', '토'].map(day => (
+                        <div key={day} className="text-center font-bold text-sm py-2">
+                          {day}
+                        </div>
+                      ))}
+                      
+                      {/* 날짜 셀 */}
+                      {monthCalendar.calendar.map((day, index) => {
+                        if (!day) {
+                          return <div key={`empty-${index}`} className="min-h-[80px]" />
+                        }
+                        
+                        const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+                        const sessions = sessionsByDate[dateKey] || []
+                        const sessionNumbers = sessions
+                          .sort((a, b) => a.session_number - b.session_number)
+                          .map(s => s.session_number)
+                          .join('/')
+                        
+                        return (
+                          <Card key={index} className="min-h-[80px]">
+                            <CardContent className="p-1">
+                              <div className="text-xs font-bold mb-1">
+                                {day.getDate()}
+                              </div>
+                              <div className="text-xs text-center">
+                                {sessionNumbers || '-'}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

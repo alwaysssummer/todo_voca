@@ -453,10 +453,10 @@ export function StudyScreen({ token }: { token: string }) {
   const generationProgressPercentage = (progress.generationCompleted / progress.generationTotal) * 100
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* 현재 단어 */}
-      <section className="h-1/3 flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-background to-muted/20 px-4">
-        <div className="text-center space-y-2">
+    <div className="h-screen flex flex-col relative">
+      {/* 현재 단어 - 상단에 여백 추가 */}
+      <section className="pt-16 pb-4 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
+        <div className="text-center">
           <h1 
             className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
               currentWord.word_text.length <= 6 
@@ -471,6 +471,10 @@ export function StudyScreen({ token }: { token: string }) {
             {currentWord.word_text}
           </h1>
         </div>
+      </section>
+
+      {/* 안다/모른다 버튼 - 화면 세로 중간 (골드존) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
         <div className="flex gap-4">
           <Button 
             size="lg" 
@@ -489,16 +493,16 @@ export function StudyScreen({ token }: { token: string }) {
             모른다
           </Button>
         </div>
-      </section>
+      </div>
 
-      {/* 완료 목록 */}
-      <section className="h-2/3 border-t bg-muted/10">
-        <div className="p-6">
-          <ScrollArea className="h-[calc(66vh-4rem)]">
-            <div className="space-y-2">
+      {/* 완료 목록 - 행간/패딩 대폭 축소 */}
+      <section className="flex-1 border-t bg-muted/10 mt-auto">
+        <div className="p-3">
+          <ScrollArea className="h-[calc(50vh-5rem)]">
+            <div className="space-y-1">
               {completedWords.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <p className="text-muted-foreground">
+                <Card className="p-6 text-center">
+                  <p className="text-muted-foreground text-sm">
                     단어를 완료하면 여기에 표시됩니다
                   </p>
                 </Card>
@@ -506,23 +510,23 @@ export function StudyScreen({ token }: { token: string }) {
                 completedWords.map((word, idx) => (
                   <Card 
                     key={`${word.id}-${idx}`}
-                    className="p-4 hover:bg-accent/50 transition-all hover:shadow-md animate-in slide-in-from-top duration-200"
+                    className="p-2 hover:bg-accent/50 transition-all hover:shadow-md animate-in slide-in-from-top duration-200"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground font-medium min-w-[2ch]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground font-medium min-w-[2ch] text-sm">
                           {completedWords.length - idx}.
                         </span>
-                        <span className="font-semibold text-lg">
+                        <span className="font-semibold text-base">
                           {word.word_text}
                         </span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           - {word.meaning}
                         </span>
                       </div>
                       {idx === 0 && (
-                        <span className="text-2xl animate-bounce">✨</span>
+                        <span className="text-xl animate-bounce">✨</span>
                       )}
                     </div>
                   </Card>

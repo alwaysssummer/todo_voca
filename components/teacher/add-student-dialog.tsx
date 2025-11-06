@@ -29,7 +29,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: AddStudentDi
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     name: '',
-    dailyGoal: '10'
+    dailyGoal: '20'
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +56,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: AddStudentDi
       if (insertError) throw insertError
 
       // 성공
-      setFormData({ name: '', dailyGoal: '10' })
+      setFormData({ name: '', dailyGoal: '20' })
       onOpenChange(false)
       onSuccess()
       router.refresh()

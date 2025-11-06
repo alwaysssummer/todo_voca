@@ -20,7 +20,8 @@ import {
   Check,
   X,
   Merge,
-  GripVertical
+  GripVertical,
+  Printer
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
@@ -28,6 +29,7 @@ import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialo
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
+import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
 import { Input } from '@/components/ui/input'
 import {
   DndContext,
@@ -174,6 +176,11 @@ export default function TeacherDashboard() {
   const [selectedWordlists, setSelectedWordlists] = useState<string[]>([])
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false)
+  
+  // 단어장 인쇄 모달 state
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [printWordlistId, setPrintWordlistId] = useState('')
+  const [printWordlistTitle, setPrintWordlistTitle] = useState('')
 
   useEffect(() => {
     console.log('🔍 [Dashboard] 로그인 상태 확인 중...')
@@ -1111,16 +1118,6 @@ export default function TeacherDashboard() {
                                 {student.completedSessions}/{student.totalSessions}
                               </Badge>
                               
-                              <Badge variant="outline" className="gap-1">
-                                <CheckCircle2 className="w-3 h-3" />
-                                {student.oTestCompleted}/{student.completedSessions}
-                              </Badge>
-                              
-                              <Badge variant="outline" className="gap-1">
-                                <XCircle className="w-3 h-3" />
-                                {student.xTestCompleted}/{student.completedSessions}
-                              </Badge>
-                              
                               <span className="text-sm font-medium">{student.progress}%</span>
                             </div>
 
@@ -1133,7 +1130,7 @@ export default function TeacherDashboard() {
                                 className="gap-2"
                               >
                                 <BookOpen className="w-3 h-3" />
-                                단어장
+                                V
                               </Button>
                               <Button
                                 size="sm"
@@ -1142,7 +1139,7 @@ export default function TeacherDashboard() {
                                 className="gap-2"
                               >
                                 <Eye className="w-3 h-3" />
-                                DESK
+                                D
                               </Button>
                               <Button
                                 size="sm"
@@ -1154,7 +1151,7 @@ export default function TeacherDashboard() {
                                 className="gap-2"
                               >
                                 <Eye className="w-3 h-3" />
-                                MOBILE
+                                M
                               </Button>
                               <Button
                                 size="sm"
@@ -1338,7 +1335,21 @@ export default function TeacherDashboard() {
                               }}
                             >
                               <Eye className="w-3 h-3" />
-                              DESK
+                              D
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => {
+                                setPrintWordlistId(wordlist.id)
+                                setPrintWordlistTitle(wordlist.title)
+                                setPrintModalOpen(true)
+                              }}
+                              title="단어장 인쇄"
+                            >
+                              <Printer className="w-3 h-3" />
+                              P
                             </Button>
                             <Button
                               size="sm"
@@ -1418,6 +1429,14 @@ export default function TeacherDashboard() {
           assignedStudents={selectedWordlist.assignedStudents}
         />
       )}
+
+      {/* 단어장 인쇄 모달 */}
+      <WholeVocabularyPrintModal
+        open={printModalOpen}
+        onClose={() => setPrintModalOpen(false)}
+        wordlistId={printWordlistId}
+        title={printWordlistTitle}
+      />
     </div>
   )
 }
