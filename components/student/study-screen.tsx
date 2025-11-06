@@ -454,9 +454,9 @@ export function StudyScreen({ token }: { token: string }) {
 
   return (
     <div className="h-screen flex flex-col relative">
-      {/* 현재 단어 - 상단에 여백 추가 */}
-      <section className="pt-16 pb-4 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
-        <div className="text-center">
+      {/* 학습 단어 - 중앙 정렬 + 약간 아래로 */}
+      <section className="pt-20 pb-8 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
+        <div className="text-center max-w-full px-4">
           <h1 
             className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
               currentWord.word_text.length <= 6 
@@ -480,7 +480,7 @@ export function StudyScreen({ token }: { token: string }) {
             size="lg" 
             onClick={onKnowClick}
             disabled={isProcessing}
-            className="min-w-[120px] text-lg h-14"
+            className="min-w-[120px] text-lg h-14 shadow-lg"
           >
             {isProcessing ? '처리 중...' : '안다'}
           </Button>
@@ -488,17 +488,17 @@ export function StudyScreen({ token }: { token: string }) {
             size="lg" 
             variant="outline" 
             onClick={onDontKnowClick}
-            className="min-w-[120px] text-lg h-14"
+            className="min-w-[120px] text-lg h-14 shadow-lg bg-white"
           >
             모른다
           </Button>
         </div>
       </div>
 
-      {/* 완료 목록 - 행간/패딩 대폭 축소 */}
-      <section className="flex-1 border-t bg-muted/10 mt-auto">
+      {/* 완료 목록 - 버튼 아래 여백 확보 */}
+      <section className="flex-1 border-t bg-muted/10 mt-auto pt-20">
         <div className="p-3">
-          <ScrollArea className="h-[calc(50vh-5rem)]">
+          <ScrollArea className="h-[calc(50vh-9rem)]">
             <div className="space-y-1">
               {completedWords.length === 0 ? (
                 <Card className="p-6 text-center">
