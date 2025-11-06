@@ -453,9 +453,9 @@ export function StudyScreen({ token }: { token: string }) {
   const generationProgressPercentage = (progress.generationCompleted / progress.generationTotal) * 100
 
   return (
-    <div className="h-screen flex flex-col relative">
-      {/* 학습 단어 - 중앙 정렬 + 약간 아래로 */}
-      <section className="pt-20 pb-8 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
+    <div className="h-screen flex flex-col">
+      {/* 1. 학습 단어 영역 - 화면의 30% */}
+      <section className="h-[30vh] flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center max-w-full px-4">
           <h1 
             className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
@@ -473,8 +473,8 @@ export function StudyScreen({ token }: { token: string }) {
         </div>
       </section>
 
-      {/* 안다/모른다 버튼 - 화면 세로 중간 (골드존) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+      {/* 2. 버튼 영역 - 화면의 20% (골드존) */}
+      <div className="h-[20vh] flex items-center justify-center px-4">
         <div className="flex gap-4">
           <Button 
             size="lg" 
@@ -495,10 +495,10 @@ export function StudyScreen({ token }: { token: string }) {
         </div>
       </div>
 
-      {/* 완료 목록 - 버튼 아래 여백 확보 */}
-      <section className="flex-1 border-t bg-muted/10 mt-auto pt-24">
-        <div className="p-3">
-          <ScrollArea className="h-[calc(50vh-10rem)]">
+      {/* 3. 완료 목록 영역 - 화면의 50% */}
+      <section className="h-[50vh] border-t bg-muted/10">
+        <div className="p-3 h-full">
+          <ScrollArea className="h-full">
             <div className="space-y-1">
               {completedWords.length === 0 ? (
                 <Card className="p-6 text-center">
