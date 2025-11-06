@@ -82,8 +82,8 @@ export async function fetchSheetData(sheetUrl: string): Promise<SheetData> {
     
     if (!dataResponse.ok) {
       throw new Error('시트 데이터를 불러올 수 없습니다.')
-    }
-    
+  }
+  
     const dataJson = await dataResponse.json()
     const rows = dataJson.values || []
     
@@ -101,14 +101,14 @@ export async function fetchSheetData(sheetUrl: string): Promise<SheetData> {
       mnemonic: row[2]?.toString().trim() || undefined,
       example: row[3]?.toString().trim() || undefined,
       example_translation: row[4]?.toString().trim() || undefined
-    })).filter(word => word.word_text && word.meaning) // 필수값이 있는 행만 포함
+    })).filter((word: any) => word.word_text && word.meaning) // 필수값이 있는 행만 포함
     
     if (words.length === 0) {
       throw new Error('유효한 단어가 없습니다. A열(영단어)과 B열(뜻)을 확인해주세요.')
-    }
-    
-    return {
-      title,
+  }
+  
+  return {
+    title,
       words
     }
   } catch (error: any) {
