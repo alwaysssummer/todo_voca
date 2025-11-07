@@ -474,6 +474,20 @@ export function StudyScreen({ token }: { token: string }) {
   const progressPercentage = (progress.today / progress.todayGoal) * 100
   const generationProgressPercentage = (progress.generationCompleted / progress.generationTotal) * 100
 
+  const meaningLength = currentWord?.meaning?.length ?? 0
+  const meaningFontClass = (() => {
+    if (meaningLength <= 6) {
+      return 'text-3xl sm:text-4xl md:text-5xl'
+    }
+    if (meaningLength <= 12) {
+      return 'text-2xl sm:text-3xl md:text-4xl'
+    }
+    if (meaningLength <= 20) {
+      return 'text-xl sm:text-2xl md:text-3xl'
+    }
+    return 'text-lg sm:text-xl md:text-2xl'
+  })()
+
   return (
     <div className="h-screen flex flex-col">
       {/* 1. 학습 단어 영역 - 화면의 30% */}
@@ -495,13 +509,7 @@ export function StudyScreen({ token }: { token: string }) {
             </h1>
           ) : (
             <h1 
-              className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center text-blue-600 ${
-                currentWord.meaning.length <= 10
-                  ? 'text-4xl sm:text-5xl md:text-6xl'
-                  : currentWord.meaning.length <= 20
-                  ? 'text-3xl sm:text-4xl md:text-5xl'
-                  : 'text-2xl sm:text-3xl md:text-4xl'
-              }`}
+              className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center text-blue-600 leading-snug ${meaningFontClass}`}
             >
               {currentWord.meaning}
             </h1>

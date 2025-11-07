@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,38 @@ interface MobileDashboardProps {
 export function MobileDashboard({ token }: MobileDashboardProps) {
   const router = useRouter()
   const { data, loading, error } = useStudentDashboard(token)
+
+  const completedSessionsRaw = data?.completedSessions ?? []
+  const currentAssignmentId = data?.currentAssignment?.id ?? null
+
+  const filteredCompletedSessions = useMemo(() => {
+    if (!currentAssignmentId) return completedSessionsRaw
+    return completedSessionsRaw.filter(session => session.assignment_id === currentAssignmentId)
+  }, [completedSessionsRaw, currentAssignmentId])
+
+  const sessions = useMemo(() => {
+    const uniqueMap = new Map<string, (typeof filteredCompletedSessions)[number]>()
+    filteredCompletedSessions
+      .slice()
+      .sort((a, b) => {
+        if (a.session_number === b.session_number) {
+          return new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
+        }
+        return b.session_number - a.session_number
+      })
+      .forEach(session => {
+        const key = `${session.session_number}-${session.completed_date}`
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, session)
+        }
+      })
+    return Array.from(uniqueMap.values()).sort((a, b) => {
+      if (a.session_number === b.session_number) {
+        return new Date(a.completed_date).getTime() - new Date(b.completed_date).getTime()
+      }
+      return a.session_number - b.session_number
+    })
+  }, [filteredCompletedSessions])
   
   // 모르는 단어 모달 state
   const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
@@ -94,10 +126,10 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
     )
   }
 
-  const { student, currentAssignment, completedSessions } = data
+  const { student, currentAssignment } = data
   
   // ⭐ 통계 계산
-  const completedSessionsCount = completedSessions.length
+  const completedSessionsCount = sessions.length
   const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
   const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
   
@@ -159,7 +191,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
         {/* 학습 기록 - 모바일 최적화 */}
         <Card>
           <CardContent className="p-4">
-            {completedSessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">아직 완성된 회차가 없습니다</p>
@@ -168,7 +200,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
             ) : (
               <div className="space-y-3">
                 {/* 회차 목록 - 체크박스와 날짜 제거, 출력 버튼 제거 */}
-                {completedSessions.map((session) => {
+                {sessions.map((session) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
                   
