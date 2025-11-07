@@ -10,6 +10,7 @@ interface DashboardData {
     session_goal: number  // 회차당 목표
   }
   currentAssignment: {
+    id: string
     generation: number
     wordlist_id: string
     wordlist_name: string
@@ -26,6 +27,7 @@ interface DashboardData {
     completed_date: string
     test_completed: boolean
     test_score: number | null
+    assignment_id: string
     // O-TEST (아는 단어 평가)
     o_test_completed: boolean
     o_test_correct: number | null
@@ -62,6 +64,7 @@ export function useStudentDashboard(token: string) {
         const { data: assignment, error: assignmentError } = await supabase
           .from('student_wordlists')
           .select(`
+            id,
             generation,
             wordlist_id,
             filtered_word_ids,
@@ -98,6 +101,7 @@ export function useStudentDashboard(token: string) {
             id,
             session_number,
             generation,
+            assignment_id,
             word_ids,
             unknown_word_ids,
             completed_date,
@@ -125,6 +129,7 @@ export function useStudentDashboard(token: string) {
             id: session.id,
             session_number: session.session_number,
             generation: session.generation,
+            assignment_id: session.assignment_id,
             word_count: session.word_ids?.length || 0,
             unknown_count: session.unknown_word_ids?.length || 0,
             completed_date: session.completed_date,
@@ -153,6 +158,7 @@ export function useStudentDashboard(token: string) {
             session_goal: student.daily_goal
           },
           currentAssignment: {
+            id: assignment.id,
             generation: assignment.generation,
             wordlist_id: assignment.wordlist_id,
             wordlist_name: wordlistData?.name || 'Unknown',

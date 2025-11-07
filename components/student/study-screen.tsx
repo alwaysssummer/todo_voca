@@ -40,6 +40,7 @@ export function StudyScreen({ token }: { token: string }) {
   
   const [goalModalOpen, setGoalModalOpen] = useState(false)
   const [completedWordlistData, setCompletedWordlistData] = useState<any>(null)
+  const [showMeaning, setShowMeaning] = useState(false)
 
   // 중복 클릭 방지
   const [isProcessing, setIsProcessing] = useState(false)
@@ -93,8 +94,14 @@ export function StudyScreen({ token }: { token: string }) {
       setShowDontKnowScreen(false)
       setDontKnowWord(null)
       setIsPaused(false)
+      setShowMeaning(false)
     }
   }, [goalModalOpen, showGenerationCompleteModal])
+
+  // 새로운 단어가 로드되면 의미 표시 상태 초기화
+  useEffect(() => {
+    setShowMeaning(false)
+  }, [currentWord?.id])
 
   const onKnowClick = async () => {
     // 중복 클릭 방지
@@ -103,10 +110,17 @@ export function StudyScreen({ token }: { token: string }) {
       return
     }
 
+    // 첫 번째 클릭에서는 뜻만 보여줌
+    if (!showMeaning) {
+      setShowMeaning(true)
+      return
+    }
+
     try {
       setIsProcessing(true)  // 처리 시작
       
       const result = await handleKnow()
+      setShowMeaning(false)
       if (result?.goalAchieved) {
         // 완성 단어장 데이터 저장
         setCompletedWordlistData(result.completedWordlistData)
@@ -128,6 +142,7 @@ export function StudyScreen({ token }: { token: string }) {
         }
       }
     } catch (err) {
+      setShowMeaning(false)
       console.error('단어 완료 처리 오류:', err)
       alert('오류가 발생했습니다')
     } finally {
@@ -135,8 +150,14 @@ export function StudyScreen({ token }: { token: string }) {
     }
   }
 
+  const onMeaningDontKnow = async () => {
+    setShowMeaning(false)
+    await onDontKnowClick()
+  }
+
   const handleGoalModalClose = () => {
     setGoalModalOpen(false)
+    setShowMeaning(false)
     
     // ⭐ 단어장 전체 완료인 경우, "단어장 학습 완료!" 모달을 이어서 표시
     if (generationModalData) {
@@ -231,6 +252,7 @@ export function StudyScreen({ token }: { token: string }) {
     
     try {
       console.log('🔴 [모른다 클릭] 시작:', currentWord.word_text)
+      setShowMeaning(false)
       
       // 현재 단어를 저장 (강조 화면에서 표시할 단어)
       setDontKnowWord(currentWord)
@@ -457,19 +479,33 @@ export function StudyScreen({ token }: { token: string }) {
       {/* 1. 학습 단어 영역 - 화면의 30% */}
       <section className="h-[30vh] flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center max-w-full px-4">
-          <h1 
-            className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
-              currentWord.word_text.length <= 6 
-                ? 'text-5xl sm:text-6xl md:text-7xl'
-                : currentWord.word_text.length <= 12
-                ? 'text-4xl sm:text-5xl md:text-6xl'
-                : currentWord.word_text.length <= 18
-                ? 'text-3xl sm:text-4xl md:text-5xl'
-                : 'text-2xl sm:text-3xl md:text-4xl'
-            }`}
-          >
-            {currentWord.word_text}
-          </h1>
+          {!showMeaning ? (
+            <h1 
+              className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
+                currentWord.word_text.length <= 6 
+                  ? 'text-5xl sm:text-6xl md:text-7xl'
+                  : currentWord.word_text.length <= 12
+                  ? 'text-4xl sm:text-5xl md:text-6xl'
+                  : currentWord.word_text.length <= 18
+                  ? 'text-3xl sm:text-4xl md:text-5xl'
+                  : 'text-2xl sm:text-3xl md:text-4xl'
+              }`}
+            >
+              {currentWord.word_text}
+            </h1>
+          ) : (
+            <h1 
+              className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center text-blue-600 ${
+                currentWord.meaning.length <= 10
+                  ? 'text-4xl sm:text-5xl md:text-6xl'
+                  : currentWord.meaning.length <= 20
+                  ? 'text-3xl sm:text-4xl md:text-5xl'
+                  : 'text-2xl sm:text-3xl md:text-4xl'
+              }`}
+            >
+              {currentWord.meaning}
+            </h1>
+          )}
         </div>
       </section>
 
@@ -482,12 +518,12 @@ export function StudyScreen({ token }: { token: string }) {
             disabled={isProcessing}
             className="min-w-[120px] text-lg h-14 shadow-lg"
           >
-            {isProcessing ? '처리 중...' : '안다'}
+            {isProcessing ? '처리 중...' : showMeaning ? '확인' : '안다'}
           </Button>
           <Button 
             size="lg" 
             variant="outline" 
-            onClick={onDontKnowClick}
+            onClick={showMeaning ? onMeaningDontKnow : onDontKnowClick}
             className="min-w-[120px] text-lg h-14 shadow-lg bg-white"
           >
             모른다

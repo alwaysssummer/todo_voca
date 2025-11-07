@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -142,6 +142,40 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     setTestResultModalOpen(true)
   }
 
+  const completedSessionsRaw = data?.completedSessions ?? []
+  const currentAssignmentId = data?.currentAssignment?.id ?? null
+
+  const filteredCompletedSessions = useMemo(() => {
+    if (!currentAssignmentId) {
+      return completedSessionsRaw
+    }
+    return completedSessionsRaw.filter(session => session.assignment_id === currentAssignmentId)
+  }, [completedSessionsRaw, currentAssignmentId])
+
+  const sessions = useMemo(() => {
+    const uniqueMap = new Map<string, (typeof filteredCompletedSessions)[number]>()
+    filteredCompletedSessions
+      .slice()
+      .sort((a, b) => {
+        if (a.session_number === b.session_number) {
+          return new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
+        }
+        return b.session_number - a.session_number
+      })
+      .forEach(session => {
+        const key = `${session.session_number}-${session.completed_date}`
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, session)
+        }
+      })
+    return Array.from(uniqueMap.values()).sort((a, b) => {
+      if (a.session_number === b.session_number) {
+        return new Date(a.completed_date).getTime() - new Date(b.completed_date).getTime()
+      }
+      return a.session_number - b.session_number
+    })
+  }, [filteredCompletedSessions])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -173,13 +207,14 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     )
   }
 
-  const { student, currentAssignment, completedSessions } = data
+  const { student, currentAssignment } = data
   
   // 날짜별로 세션 그룹핑
   const getSessionsByDate = () => {
-    const sessionsByDate: Record<string, typeof completedSessions> = {}
+    type Session = typeof sessions[number]
+    const sessionsByDate: Record<string, Session[]> = {}
     
-    completedSessions.forEach(session => {
+    sessions.forEach(session => {
       const date = new Date(session.completed_date)
       const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
       
@@ -244,22 +279,22 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   
   // 전체 선택/해제 토글 (모든 세션 대상)
   const toggleSelectAll = () => {
-    if (selectedSessionsForExam.length === completedSessions.length) {
+    if (selectedSessionsForExam.length === sessions.length) {
       // 전체 선택 상태 → 전체 해제
       setSelectedSessionsForExam([])
     } else {
       // 일부 또는 없음 → 전체 선택
-      const allSessionIds = completedSessions.map(session => session.id)
+      const allSessionIds = sessions.map(session => session.id)
       setSelectedSessionsForExam(allSessionIds)
     }
   }
 
   // 전체 선택 여부 계산
-  const isAllSelected = completedSessions.length > 0 && 
-                        selectedSessionsForExam.length === completedSessions.length
+  const isAllSelected = sessions.length > 0 && 
+                        selectedSessionsForExam.length === sessions.length
   
   // ⭐ 통계 계산
-  const completedSessionsCount = completedSessions.length
+  const completedSessionsCount = sessions.length
   const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
   const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
   
@@ -318,7 +353,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
         {/* 학습 기록 */}
         <Card>
           <CardContent className="pt-4">
-            {completedSessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">아직 완성된 회차가 없습니다</p>
@@ -337,7 +372,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                     <span className="text-sm font-medium text-muted-foreground">
                       A
                       <span className="ml-1 text-blue-600 font-semibold">
-                        ({selectedSessionsForExam.length}/{completedSessions.length})
+                        ({selectedSessionsForExam.length}/{sessions.length})
                       </span>
                     </span>
                     
@@ -425,7 +460,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                 </div>
 
                 {/* 전체 보기 - 회차 목록 */}
-                {viewMode === 'all' && completedSessions.map((session) => {
+                {viewMode === 'all' && sessions.map((session) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
                   

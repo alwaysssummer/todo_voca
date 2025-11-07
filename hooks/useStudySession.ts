@@ -26,24 +26,53 @@ function calculateProgress(
   generationTotal: number
   session: number
 } {
-  const todayProgress = completedCount % sessionGoal
-  
-  let currentSession: number
-  if (completedCount === 0) {
-    currentSession = 1  // 시작
-  } else if (todayProgress === 0) {
-    // 배수 완료 = 이전 회차 완료 → 다음 회차 시작
-    currentSession = (completedCount / sessionGoal) + 1
-  } else {
-    // 진행 중
-    currentSession = Math.ceil(completedCount / sessionGoal)
+  const safeGoal = Math.max(1, sessionGoal || 1)
+  const safeTotal = Math.max(0, totalWords || 0)
+
+  if (safeTotal === 0) {
+    return {
+      today: 0,
+      todayGoal: safeGoal,
+      generationCompleted: 0,
+      generationTotal: 0,
+      session: 1
+    }
   }
-  
+
+  const clampedCompleted = Math.max(0, Math.min(completedCount, safeTotal))
+
+  const totalSessions = Math.max(1, Math.ceil(safeTotal / safeGoal))
+
+  let currentSession: number
+  if (clampedCompleted === 0) {
+    currentSession = 1
+  } else if (clampedCompleted >= safeTotal) {
+    currentSession = totalSessions
+  } else {
+    currentSession = Math.floor(clampedCompleted / safeGoal) + 1
+  }
+
+  currentSession = Math.min(Math.max(currentSession, 1), totalSessions)
+
+  const wordsBeforeThisSession = Math.min((currentSession - 1) * safeGoal, safeTotal)
+  const remainingWords = Math.max(0, safeTotal - wordsBeforeThisSession)
+  const todayGoal = Math.min(safeGoal, remainingWords)
+
+  let today = clampedCompleted - wordsBeforeThisSession
+  if (today < 0) {
+    today = 0
+  }
+
+  const effectiveTodayGoal = todayGoal > 0 ? todayGoal : safeGoal
+  if (effectiveTodayGoal > 0) {
+    today = Math.min(today, effectiveTodayGoal)
+  }
+
   return {
-    today: todayProgress,
-    todayGoal: sessionGoal,
-    generationCompleted: completedCount,
-    generationTotal: totalWords,
+    today,
+    todayGoal: effectiveTodayGoal,
+    generationCompleted: clampedCompleted,
+    generationTotal: safeTotal,
     session: currentSession
   }
 }
@@ -54,8 +83,20 @@ function calculateProgress(
  * @param sessionGoal - 회차당 목표 단어 개수
  * @returns 회차 완료 여부
  */
-function isSessionComplete(completedCount: number, sessionGoal: number): boolean {
-  return completedCount > 0 && (completedCount % sessionGoal === 0)
+function isSessionComplete(
+  completedCount: number,
+  sessionGoal: number,
+  totalWords: number
+): boolean {
+  if (completedCount <= 0) return false
+
+  const afterProgress = calculateProgress(completedCount, sessionGoal, totalWords)
+  if (afterProgress.todayGoal > 0 && afterProgress.today >= afterProgress.todayGoal) {
+    return true
+  }
+
+  const beforeProgress = calculateProgress(completedCount - 1, sessionGoal, totalWords)
+  return afterProgress.session > beforeProgress.session
 }
 
 // ===================================================================
@@ -237,26 +278,12 @@ export function useStudySession(token: string) {
 
     // C. 현재 회차 및 회차 내 진행률 계산
     const completed = generationCompletedCount || 0
-    const todayProgress = completed % assignment.session_goal
-    
-    // ⭐ 회차 계산 수정: 배수 완료 시 다음 회차로
-    // todayProgress === 0이면 이전 회차 완료 → 다음 회차 시작
-    let currentSession: number
-    if (completed === 0) {
-      currentSession = 1  // 첫 시작
-    } else if (todayProgress === 0) {
-      currentSession = (completed / assignment.session_goal) + 1  // 배수 완료 → 다음 회차
-    } else {
-      currentSession = Math.ceil(completed / assignment.session_goal)  // 진행 중
-    }
 
-    const newProgress = {
-      today: todayProgress,  // 현재 회차 내 진행률
-      todayGoal: assignment.session_goal,
-      generationCompleted: completed,
-      generationTotal: generationTotal,
-      session: currentSession
-    }
+    const newProgress = calculateProgress(
+      completed,
+      assignment.session_goal,
+      generationTotal
+    )
 
     setProgress(newProgress)
 
@@ -504,7 +531,7 @@ export function useStudySession(token: string) {
     if (!student || !currentAssignment || !currentWordlist) return false
 
     const targetWordIds = await getTargetWordIds()
-    const totalWords = targetWordIds.length
+  const totalWords = targetWordIds.length
 
     // ⭐ 1. 완료된 단어 수
     const { count: completedCount } = await supabase
@@ -528,7 +555,7 @@ export function useStudySession(token: string) {
     console.log(`🔍 단어장 완료 체크: ${studiedCount}/${totalWords}개 학습 완료 (O:${completedCount}, X:${skippedCount})`)
 
     // ⭐ 모든 단어를 학습했으면 완료
-    return studiedCount >= totalWords
+  return studiedCount >= totalWords
   }
 
   // Skip한 단어 찾기 (현재 단어장)
@@ -885,10 +912,12 @@ export function useStudySession(token: string) {
       
       // ⭐ 진행률 계산 (순수 함수 사용으로 단순화)
       const newCompleted = progress.generationCompleted + 1
+      const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
+
       const newProgress = calculateProgress(
         newCompleted,
         currentAssignment.session_goal,
-        currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
+        totalWordCount
       )
       
       setProgress(newProgress)
@@ -902,6 +931,14 @@ export function useStudySession(token: string) {
         console.log('🎉 단어장 학습 완료!')
         const skippedWords = await getSkippedWords()
         console.log('🟢 [handleKnow] Skip된 단어 개수:', skippedWords.length)
+        
+        const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
+        const finalProgress = calculateProgress(
+          totalWordCount,
+          currentAssignment.session_goal,
+          totalWordCount
+        )
+        setProgress(finalProgress)
         
         // 마지막 회차 완성 단어장 생성
         const completedData = await createCompletedWordlist(newCompleted)
@@ -959,7 +996,7 @@ export function useStudySession(token: string) {
       }
 
       // B. 회차 목표 달성 체크 (순수 함수 사용)
-      if (isSessionComplete(newCompleted, currentAssignment.session_goal)) {
+      if (isSessionComplete(newCompleted, currentAssignment.session_goal, totalWordCount)) {
         console.log(`🎯 ${newProgress.session - 1}회차 완료! (${newCompleted}개)`)
         
         // 완성 단어장 생성 (정확한 completed 값 전달)
