@@ -6,11 +6,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStudySession } from '@/hooks/useStudySession'
+import { useTTS } from '@/hooks/useTTS'
 import { SkipModalMinimal } from './skip-modal-minimal'
 import { SkipModalMedium } from './skip-modal-medium'
 import { GoalAchievedModal } from './goal-achieved-modal'
 import { GenerationCompleteModal } from './generation-complete-modal'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Volume2 } from 'lucide-react'
 import type { Word } from '@/types/word'
 
 export function StudyScreen({ token }: { token: string }) {
@@ -33,6 +34,9 @@ export function StudyScreen({ token }: { token: string }) {
     generationModalData,
     setGenerationModalData
   } = useStudySession(token)
+
+  // TTS (발음 재생)
+  const { speak, isPlaying, isLoading: ttsLoading } = useTTS()
 
   const [skipModalOpen, setSkipModalOpen] = useState(false)
   const [skipModalType, setSkipModalType] = useState<'minimal' | 'medium'>('minimal')
@@ -494,19 +498,34 @@ export function StudyScreen({ token }: { token: string }) {
       <section className="h-[30vh] flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center max-w-full px-4">
           {!showMeaning ? (
-            <h1 
-              className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center ${
-                currentWord.word_text.length <= 6 
-                  ? 'text-5xl sm:text-6xl md:text-7xl'
-                  : currentWord.word_text.length <= 12
-                  ? 'text-4xl sm:text-5xl md:text-6xl'
-                  : currentWord.word_text.length <= 18
-                  ? 'text-3xl sm:text-4xl md:text-5xl'
-                  : 'text-2xl sm:text-3xl md:text-4xl'
-              }`}
-            >
-              {currentWord.word_text}
-            </h1>
+            <div className="flex items-center justify-center gap-2 animate-in fade-in zoom-in duration-300">
+              <h1 
+                className={`font-bold tracking-tight break-words text-center ${
+                  currentWord.word_text.length <= 6 
+                    ? 'text-5xl sm:text-6xl md:text-7xl'
+                    : currentWord.word_text.length <= 12
+                    ? 'text-4xl sm:text-5xl md:text-6xl'
+                    : currentWord.word_text.length <= 18
+                    ? 'text-3xl sm:text-4xl md:text-5xl'
+                    : 'text-2xl sm:text-3xl md:text-4xl'
+                }`}
+              >
+                {currentWord.word_text}
+              </h1>
+              {/* 발음 버튼 */}
+              <button
+                onClick={() => speak(currentWord.word_text)}
+                disabled={isPlaying || ttsLoading}
+                className="p-2 sm:p-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 flex-shrink-0"
+                title="발음 듣기"
+              >
+                {ttsLoading ? (
+                  <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-gray-400" />
+                ) : (
+                  <Volume2 className={`w-5 h-5 sm:w-6 sm:h-6 ${isPlaying ? 'text-blue-500' : 'text-gray-400 hover:text-gray-600'}`} />
+                )}
+              </button>
+            </div>
           ) : (
             <h1 
               className={`font-bold tracking-tight animate-in fade-in zoom-in duration-300 break-words text-center text-blue-600 leading-snug ${meaningFontClass}`}
@@ -644,19 +663,37 @@ export function StudyScreen({ token }: { token: string }) {
             onClick={togglePause}
           >
             <CardContent className="p-6 sm:p-12 text-center space-y-4 sm:space-y-6">
-              {/* 단어 (동적 크기 조정) */}
-              <div 
-                className={`font-bold text-gray-900 break-words ${
-                  dontKnowWord.word_text.length <= 6 
-                    ? 'text-5xl sm:text-6xl md:text-7xl'  // 짧은 단어 (예: apple)
-                    : dontKnowWord.word_text.length <= 12
-                    ? 'text-4xl sm:text-5xl md:text-6xl'  // 중간 단어 (예: individual)
-                    : dontKnowWord.word_text.length <= 18
-                    ? 'text-3xl sm:text-4xl md:text-5xl'  // 긴 단어 (예: accommodation)
-                    : 'text-2xl sm:text-3xl md:text-4xl'  // 매우 긴 단어
-                }`}
-              >
-                {dontKnowWord.word_text}
+              {/* 단어 (동적 크기 조정) + 발음 버튼 */}
+              <div className="flex items-center justify-center gap-2">
+                <div 
+                  className={`font-bold text-gray-900 break-words ${
+                    dontKnowWord.word_text.length <= 6 
+                      ? 'text-5xl sm:text-6xl md:text-7xl'  // 짧은 단어 (예: apple)
+                      : dontKnowWord.word_text.length <= 12
+                      ? 'text-4xl sm:text-5xl md:text-6xl'  // 중간 단어 (예: individual)
+                      : dontKnowWord.word_text.length <= 18
+                      ? 'text-3xl sm:text-4xl md:text-5xl'  // 긴 단어 (예: accommodation)
+                      : 'text-2xl sm:text-3xl md:text-4xl'  // 매우 긴 단어
+                  }`}
+                >
+                  {dontKnowWord.word_text}
+                </div>
+                {/* 발음 버튼 */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation() // 카드 클릭(일시정지) 이벤트 전파 방지
+                    speak(dontKnowWord.word_text)
+                  }}
+                  disabled={isPlaying || ttsLoading}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors disabled:opacity-50"
+                  title="발음 듣기"
+                >
+                  {ttsLoading ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+                  ) : (
+                    <Volume2 className={`w-6 h-6 ${isPlaying ? 'text-blue-500' : 'text-gray-500 hover:text-gray-700'}`} />
+                  )}
+                </button>
               </div>
               
               {/* 뜻 (동적 크기 조정) */}

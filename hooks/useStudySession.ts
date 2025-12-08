@@ -261,26 +261,38 @@ export function useStudySession(token: string) {
   // 진행률 업데이트 함수
   const updateProgress = async (studentId: string, assignment: Assignment, wordlist: Wordlist) => {
     // A. 단어장 전체 완료 개수
-    let generationQuery = supabase
+    let completedQuery = supabase
       .from('student_word_progress')
       .select('*', { count: 'exact', head: true })
       .eq('student_id', studentId)
       .eq('status', 'completed')
 
     if (assignment.filtered_word_ids && assignment.filtered_word_ids.length > 0) {
-      generationQuery = generationQuery.in('word_id', assignment.filtered_word_ids)
+      completedQuery = completedQuery.in('word_id', assignment.filtered_word_ids)
     }
 
-    const { count: generationCompletedCount } = await generationQuery
+    const { count: completedCount } = await completedQuery
+
+    let skippedQuery = supabase
+      .from('student_word_progress')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('status', 'skipped')
+
+    if (assignment.filtered_word_ids && assignment.filtered_word_ids.length > 0) {
+      skippedQuery = skippedQuery.in('word_id', assignment.filtered_word_ids)
+    }
+
+    const { count: skippedCount } = await skippedQuery
 
     // B. 단어장 전체 단어 수
     const generationTotal = assignment.filtered_word_ids?.length || wordlist.total_words
 
-    // C. 현재 회차 및 회차 내 진행률 계산
-    const completed = generationCompletedCount || 0
+    // C. 현재 회차 및 회차 내 진행률 계산 (Skip 포함)
+    const studiedCount = (completedCount || 0) + (skippedCount || 0)
 
     const newProgress = calculateProgress(
-      completed,
+      studiedCount,
       assignment.session_goal,
       generationTotal
     )
@@ -890,6 +902,7 @@ export function useStudySession(token: string) {
     try {
       const today = new Date().toISOString().split('T')[0]
       const currentSession = progress.session  // ⭐ 현재 회차
+      const previousStudied = progress.generationCompleted
 
       // 진도 업데이트
       const { error } = await supabase
@@ -910,114 +923,120 @@ export function useStudySession(token: string) {
       // 완료 목록에 추가
       setCompletedWords([currentWord, ...completedWords])
       
-      // ⭐ 진행률 계산 (순수 함수 사용으로 단순화)
-      const newCompleted = progress.generationCompleted + 1
       const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
-
-      const newProgress = calculateProgress(
-        newCompleted,
+      let progressAfterKnow = calculateProgress(
+        progress.generationCompleted + 1,
         currentAssignment.session_goal,
         totalWordCount
       )
-      
-      setProgress(newProgress)
 
-      // ⭐⭐⭐ A. 단어장 완료 체크 (최우선 - 마지막 단어 무한로딩 방지!)
-      console.log('🟢 [handleKnow] 단어장 완료 체크 시작... newCompleted:', newCompleted)
-      const isWordlistComplete = await checkWordlistComplete()
-      console.log('🟢 [handleKnow] 단어장 완료 체크 결과:', isWordlistComplete)
-      
-      if (isWordlistComplete) {
-        console.log('🎉 단어장 학습 완료!')
-        const skippedWords = await getSkippedWords()
-        console.log('🟢 [handleKnow] Skip된 단어 개수:', skippedWords.length)
+      if (currentAssignment && currentWordlist) {
+        progressAfterKnow = await updateProgress(student.id, currentAssignment, currentWordlist)
+      } else {
+        setProgress(progressAfterKnow)
+      }
+
+      const newCompleted = progressAfterKnow.generationCompleted
+      const gainedNewStudy = newCompleted > previousStudied
+
+      if (gainedNewStudy) {
+        // ⭐⭐⭐ A. 단어장 완료 체크 (최우선 - 마지막 단어 무한로딩 방지!)
+        console.log('🟢 [handleKnow] 단어장 완료 체크 시작... newCompleted:', newCompleted)
+        const isWordlistComplete = await checkWordlistComplete()
+        console.log('🟢 [handleKnow] 단어장 완료 체크 결과:', isWordlistComplete)
         
-        const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
-        const finalProgress = calculateProgress(
-          totalWordCount,
-          currentAssignment.session_goal,
-          totalWordCount
-        )
-        setProgress(finalProgress)
-        
-        // 마지막 회차 완성 단어장 생성
-        const completedData = await createCompletedWordlist(newCompleted)
-        console.log('🟢 [handleKnow] 완성 단어장 생성 완료:', completedData)
-        
-        // ⭐⭐⭐ 중요: 단어장 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
-        console.log('🟢 [handleKnow] setCurrentWord(null) 호출 - 무한 루프 방지!')
-        setCurrentWord(null)
-        
-        if (skippedWords.length > 0) {
-          // ⭐ 중복 방지: 이미 생성 중이면 skip
-          if (isGeneratingReview) {
-            console.warn('⚠️ 복습 단어장 생성 중... 중복 요청 무시')
+        if (isWordlistComplete) {
+          console.log('🎉 단어장 학습 완료!')
+          const skippedWords = await getSkippedWords()
+          console.log('🟢 [handleKnow] Skip된 단어 개수:', skippedWords.length)
+          
+          const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
+          const finalProgress = calculateProgress(
+            totalWordCount,
+            currentAssignment.session_goal,
+            totalWordCount
+          )
+          setProgress(finalProgress)
+          
+          // 마지막 회차 완성 단어장 생성
+          const completedData = await createCompletedWordlist(newCompleted)
+          console.log('🟢 [handleKnow] 완성 단어장 생성 완료:', completedData)
+          
+          // ⭐⭐⭐ 중요: 단어장 완료 시 현재 단어를 null로 설정하여 무한 루프 방지
+          console.log('🟢 [handleKnow] setCurrentWord(null) 호출 - 무한 루프 방지!')
+          setCurrentWord(null)
+          
+          if (skippedWords.length > 0) {
+            // ⭐ 중복 방지: 이미 생성 중이면 skip
+            if (isGeneratingReview) {
+              console.warn('⚠️ 복습 단어장 생성 중... 중복 요청 무시')
+              return { 
+                goalAchieved: true,
+                completedWordlistData: completedData,
+                generationComplete: true,
+                nextGenerationCreated: false,
+                skippedCount: skippedWords.length
+              }
+            }
+
+            setIsGeneratingReview(true)
+            
+            try {
+              // ⭐ 복습 단어장 자동 생성 (새로운 wordlist 생성)
+              const reviewResult = await createReviewWordlist(skippedWords)
+              
+              if (reviewResult) {
+                console.log(`🎉 복습 단어장 생성 완료: ${reviewResult.wordlist.name}`)
+                console.log(`📚 강사 대시보드에서 확인 가능`)
+              }
+              
+              return { 
+                goalAchieved: true,
+                completedWordlistData: completedData,
+                generationComplete: true,
+                nextGenerationCreated: true,
+                skippedCount: skippedWords.length,
+                reviewWordlist: reviewResult?.wordlist  // 복습 단어장 정보
+              }
+            } finally {
+              setIsGeneratingReview(false)
+            }
+          } else {
+            // 완벽 암기!
             return { 
               goalAchieved: true,
               completedWordlistData: completedData,
               generationComplete: true,
               nextGenerationCreated: false,
-              skippedCount: skippedWords.length
+              perfectCompletion: true
             }
           }
+        }
 
-          setIsGeneratingReview(true)
+        // B. 회차 목표 달성 체크 (순수 함수 사용)
+        if (isSessionComplete(newCompleted, currentAssignment.session_goal, totalWordCount)) {
+          console.log(`🎯 ${progressAfterKnow.session - 1}회차 완료! (${newCompleted}개)`)
           
-          try {
-            // ⭐ 복습 단어장 자동 생성 (새로운 wordlist 생성)
-            const reviewResult = await createReviewWordlist(skippedWords)
-            
-            if (reviewResult) {
-              console.log(`🎉 복습 단어장 생성 완료: ${reviewResult.wordlist.name}`)
-              console.log(`📚 강사 대시보드에서 확인 가능`)
-            }
-            
-            return { 
-              goalAchieved: true,
-              completedWordlistData: completedData,
-              generationComplete: true,
-              nextGenerationCreated: true,
-              skippedCount: skippedWords.length,
-              reviewWordlist: reviewResult?.wordlist  // 복습 단어장 정보
-            }
-          } finally {
-            setIsGeneratingReview(false)
+          // 완성 단어장 생성 (정확한 completed 값 전달)
+          const completedData = await createCompletedWordlist(newCompleted)
+          
+          // completedData가 null이면 에러 처리 (Skip된 단어로 인한 부족)
+          if (!completedData) {
+            console.error('❌ 완성 단어장 생성 실패 - Skip된 단어가 있을 가능성')
+            console.warn('⚠️ 회차 완료 처리를 건너뛰고 다음 단어를 계속 학습합니다')
+            // 회차 완료 처리 안 하고 다음 단어 로드
+            await fetchNextWord()
+            return { goalAchieved: false }
           }
-        } else {
-          // 완벽 암기!
+          
+          // 회차 목표만 달성 - 다음 회차 첫 단어 로드
+          await fetchNextWord(true)  // ⭐ forceRefresh로 진행률 갱신 후 다음 단어 로드
+          
           return { 
             goalAchieved: true,
             completedWordlistData: completedData,
-            generationComplete: true,
-            nextGenerationCreated: false,
-            perfectCompletion: true
+            generationComplete: false
           }
-        }
-      }
-
-      // B. 회차 목표 달성 체크 (순수 함수 사용)
-      if (isSessionComplete(newCompleted, currentAssignment.session_goal, totalWordCount)) {
-        console.log(`🎯 ${newProgress.session - 1}회차 완료! (${newCompleted}개)`)
-        
-        // 완성 단어장 생성 (정확한 completed 값 전달)
-        const completedData = await createCompletedWordlist(newCompleted)
-        
-        // completedData가 null이면 에러 처리 (Skip된 단어로 인한 부족)
-        if (!completedData) {
-          console.error('❌ 완성 단어장 생성 실패 - Skip된 단어가 있을 가능성')
-          console.warn('⚠️ 회차 완료 처리를 건너뛰고 다음 단어를 계속 학습합니다')
-          // 회차 완료 처리 안 하고 다음 단어 로드
-          await fetchNextWord()
-          return { goalAchieved: false }
-        }
-        
-        // 회차 목표만 달성 - 다음 회차 첫 단어 로드
-        await fetchNextWord(true)  // ⭐ forceRefresh로 진행률 갱신 후 다음 단어 로드
-        
-        return { 
-          goalAchieved: true,
-          completedWordlistData: completedData,
-          generationComplete: false
         }
       }
 
@@ -1069,6 +1088,10 @@ export function useStudySession(token: string) {
         }, {
           onConflict: 'student_id,word_id'
         })
+
+      if (currentAssignment && currentWordlist) {
+        await updateProgress(student.id, currentAssignment, currentWordlist)
+      }
 
       return {
         skipCount: newSkipCount,
