@@ -659,7 +659,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                             <div className="space-y-1">
                               {sessions.length > 0 ? (
                                 sessions
-                                  .sort((a, b) => a.session_number - b.session_number)
+                                  .sort((a, b) => b.session_number - a.session_number)
                                   .map(session => (
                                     <div key={session.id} className="text-xs">
                                       {session.session_number}회 {session.x_test_correct}/{session.x_test_total}
@@ -721,7 +721,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                         const dateKey = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
                         const sessions = sessionsByDate[dateKey] || []
                         const sessionNumbers = sessions
-                          .sort((a, b) => a.session_number - b.session_number)
+                          .sort((a, b) => b.session_number - a.session_number)
                           .map(s => s.session_number)
                           .join('/')
                         
