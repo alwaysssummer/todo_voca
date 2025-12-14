@@ -26,8 +26,12 @@ export function useTTS() {
 
       if (!response.ok) {
         const error = await response.json()
+        console.error('❌ [useTTS] TTS API 요청 실패:', error)
+        console.error('❌ [useTTS] Status:', response.status)
         throw new Error(error.error || 'TTS request failed')
       }
+      
+      console.log('✅ [useTTS] TTS API 응답 성공')
 
       const { audioContent } = await response.json()
       
@@ -47,7 +51,8 @@ export function useTTS() {
       
       await audio.play()
     } catch (error) {
-      console.error('TTS Error:', error)
+      console.error('❌ [useTTS] TTS 에러 발생:', error)
+      console.warn('⚠️ [useTTS] 브라우저 기본 TTS로 폴백')
       // 에러 시 브라우저 기본 TTS로 폴백
       fallbackSpeak(text)
     } finally {

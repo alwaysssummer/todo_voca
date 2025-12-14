@@ -9,8 +9,11 @@ export async function POST(request: NextRequest) {
     }
 
     const apiKey = process.env.GOOGLE_CLOUD_TTS_API_KEY
+    console.log('🔑 [TTS] API Key exists:', !!apiKey)
+    console.log('🔑 [TTS] API Key length:', apiKey?.length)
+    
     if (!apiKey) {
-      console.error('GOOGLE_CLOUD_TTS_API_KEY is not configured')
+      console.error('❌ [TTS] GOOGLE_CLOUD_TTS_API_KEY is not configured')
       return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
     }
 
@@ -38,12 +41,15 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const error = await response.json()
-      console.error('Google TTS Error:', error)
+      console.error('❌ [TTS] Google TTS API Error:', error)
+      console.error('❌ [TTS] Response status:', response.status)
       return NextResponse.json(
         { error: error.error?.message || 'TTS failed' }, 
         { status: response.status }
       )
     }
+    
+    console.log('✅ [TTS] Google TTS API 호출 성공')
 
     const data = await response.json()
     

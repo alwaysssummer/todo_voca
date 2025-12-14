@@ -18,6 +18,14 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 
 # =============================================================================
+# Google Cloud TTS API (필수 - 발음 기능용)
+# =============================================================================
+
+# Google Cloud Text-to-Speech API Key
+# 없으면 브라우저 기본 TTS로 폴백 (한국식 발음)
+GOOGLE_CLOUD_TTS_API_KEY=your-google-cloud-tts-api-key-here
+
+# =============================================================================
 # Google Sheets API (선택 - 단어장 추가 기능용)
 # =============================================================================
 
@@ -50,7 +58,38 @@ NEXT_PUBLIC_GOOGLE_API_KEY=your-google-api-key-here
 4. `lib/supabase/sample-data.sql` 파일 내용 복사
 5. SQL Editor에 붙여넣고 실행 (샘플 데이터)
 
-## 🔑 Google Sheets API 설정 (선택)
+## 🔑 Google Cloud TTS API 설정 (필수 - 발음 기능)
+
+원어민 발음 기능을 사용하려면 Google Cloud Text-to-Speech API Key가 필요합니다.
+
+### 1. Google Cloud Console 설정
+
+1. [Google Cloud Console](https://console.cloud.google.com) 접속
+2. 프로젝트 생성 또는 선택
+3. **APIs & Services** → **Library**
+4. "Cloud Text-to-Speech API" 검색 후 **ENABLE** 클릭
+5. **Billing 활성화 필요** (무료 할당량: 월 100만 글자)
+
+### 2. API Key 생성
+
+1. **APIs & Services** → **Credentials**
+2. **Create Credentials** → **API Key**
+3. 생성된 키 복사
+4. `.env.local`의 `GOOGLE_CLOUD_TTS_API_KEY`에 입력
+
+### 3. API Key 보안 설정 (중요!)
+
+1. 생성된 API Key 클릭
+2. **API restrictions**:
+   - **Restrict key** 선택
+   - **Cloud Text-to-Speech API**만 선택
+3. **Save** 클릭
+
+⚠️ **주의:** 서버 사이드에서 사용하므로 HTTP referrer 제한은 불필요
+
+---
+
+## 🔑 Google Sheets API 설정 (선택 - 단어장 추가 기능)
 
 단어장 추가 기능을 사용하려면 Google API Key가 필요합니다.
 
@@ -91,6 +130,7 @@ NEXT_PUBLIC_GOOGLE_API_KEY=your-google-api-key-here
 ### Vercel 배포 시
 - Vercel Dashboard → Settings → Environment Variables
 - 위의 환경 변수들을 동일하게 입력
+- **중요:** `GOOGLE_CLOUD_TTS_API_KEY`는 반드시 추가!
 - Production, Preview, Development 환경 모두 선택
 
 ## ✅ 설정 확인
