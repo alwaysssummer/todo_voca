@@ -31,16 +31,24 @@ export function SkipModalMedium({
   const [isPlaying, setIsPlaying] = useState(false)
   const [isSkipping, setIsSkipping] = useState(false)
 
-  const handlePlayAudio = () => {
+  const handlePlayAudio = async () => {
     if (!word.audio_url) return
     
     const audio = new Audio(word.audio_url)
     setIsPlaying(true)
-    audio.play()
-    audio.onended = () => setIsPlaying(false)
+    
+    try {
+      await audio.play()
+      audio.onended = () => setIsPlaying(false)
+    } catch (error) {
+      setIsPlaying(false)
+      console.error('Audio playback failed:', error)
+      alert('발음을 재생할 수 없습니다. 브라우저 설정을 확인해주세요.')
+    }
+    
     audio.onerror = () => {
       setIsPlaying(false)
-      alert('발음을 재생할 수 없습니다')
+      alert('오디오 파일을 불러올 수 없습니다')
     }
   }
 
