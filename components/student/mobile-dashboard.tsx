@@ -80,14 +80,14 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
   const [testResultModalData, setTestResultModalData] = useState<{
     sessionNumber: number
     testType: 'known' | 'unknown'
-    wrongWordIds: string[] | null
+    wrongWordIds: number[] | null
   } | null>(null)
 
   // 테스트 결과 보기 핸들러
   const handleViewTestResult = (
-    sessionNumber: number, 
+    sessionNumber: number,
     testType: 'known' | 'unknown',
-    wrongWordIds: string[] | null
+    wrongWordIds: number[] | null
   ) => {
     setTestResultModalData({
       sessionNumber,

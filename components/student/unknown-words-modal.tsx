@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Printer, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { CompletedWordlist } from '@/types/database'
 
 interface Word {
   word_text: string
@@ -42,7 +43,7 @@ export function UnknownWordsModal({
         .from('completed_wordlists')
         .select('unknown_word_ids')
         .eq('id', sessionId)
-        .single()
+        .single<Pick<CompletedWordlist, 'unknown_word_ids'>>()
 
       if (session?.unknown_word_ids && session.unknown_word_ids.length > 0) {
         const { data: wordData } = await supabase

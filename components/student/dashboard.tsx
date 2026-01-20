@@ -80,7 +80,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   const [testResultModalData, setTestResultModalData] = useState<{
     sessionNumber: number
     testType: 'known' | 'unknown'
-    wrongWordIds: string[] | null
+    wrongWordIds: number[] | null
   } | null>(null)
 
   // 체크박스 토글 함수
@@ -130,9 +130,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   // 테스트 결과 보기 핸들러
   const handleViewTestResult = (
-    sessionNumber: number, 
+    sessionNumber: number,
     testType: 'known' | 'unknown',
-    wrongWordIds: string[] | null
+    wrongWordIds: number[] | null
   ) => {
     setTestResultModalData({
       sessionNumber,

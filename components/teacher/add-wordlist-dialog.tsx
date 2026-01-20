@@ -74,7 +74,7 @@ export function AddWordlistDialog({
       const teacherId = sessionStorage.getItem('teacher_id') || localStorage.getItem('teacher_id')
       
       // 1. wordlist 생성
-      const { data: wordlist, error: wordlistError } = await supabase
+      const { data: wordlist, error: wordlistError } = await (supabase as any)
         .from('wordlists')
         .insert({
           name: wordlistName,
@@ -97,7 +97,7 @@ export function AddWordlistDialog({
         sequence_order: idx + 1
       }))
 
-      const { error: wordsError } = await supabase
+      const { error: wordsError } = await (supabase as any)
         .from('words')
         .insert(wordsToInsert)
 

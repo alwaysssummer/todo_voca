@@ -58,6 +58,7 @@ export function AssignWordlistDialog({
         .from('wordlists')
         .select('id, name, total_words')
         .order('display_order', { ascending: true })
+        .returns<{ id: string; name: string; total_words: number }[]>()
 
       if (wordlistsError) throw wordlistsError
 
@@ -66,6 +67,7 @@ export function AssignWordlistDialog({
         .from('student_wordlists')
         .select('wordlist_id')
         .eq('student_id', studentId)
+        .returns<{ wordlist_id: string }[]>()
 
       if (assignedError) throw assignedError
 
@@ -114,7 +116,7 @@ export function AssignWordlistDialog({
         .from('users')
         .select('daily_goal')
         .eq('id', studentId)
-        .single()
+        .single<{ daily_goal: number | null }>()
 
       if (studentError) {
         throw new Error(`학생 정보를 가져올 수 없습니다: ${studentError.message || studentError.code}`)
@@ -126,6 +128,7 @@ export function AssignWordlistDialog({
         .from('student_wordlists')
         .select('wordlist_id')
         .eq('student_id', studentId)
+        .returns<{ wordlist_id: string }[]>()
 
       const oldWordlistIds = oldAssignments?.map(a => a.wordlist_id) || []
 
@@ -159,6 +162,7 @@ export function AssignWordlistDialog({
           .select('id')
           .eq('student_id', studentId)
           .in('wordlist_id', oldWordlistIds)
+          .returns<{ id: string }[]>()
 
         const completedWordlistIds = completedWordlists?.map(c => c.id) || []
         
@@ -182,6 +186,7 @@ export function AssignWordlistDialog({
           .from('words')
           .select('id')
           .in('wordlist_id', oldWordlistIds)
+          .returns<{ id: number }[]>()
 
         const wordIds = words?.map(w => w.id) || []
         
@@ -202,14 +207,17 @@ export function AssignWordlistDialog({
 
       // ⭐ 5. 새로운 배정 추가
       if (selectedWordlists.length > 0) {
+        // ⭐ daily_goal을 20~100 범위로 클램프 (DB 제약조건: CHECK (daily_goal BETWEEN 20 AND 100))
+        const clampedDailyGoal = Math.max(20, Math.min(100, student.daily_goal || 20))
+
         const assignmentsToInsert = selectedWordlists.map(wordlistId => ({
           student_id: studentId,
           wordlist_id: wordlistId,
           assigned_by: teacherId,
-          daily_goal: student.daily_goal || 50
+          daily_goal: clampedDailyGoal
         }))
 
-        const { error: insertError } = await supabase
+        const { error: insertError } = await (supabase as any)
           .from('student_wordlists')
           .insert(assignmentsToInsert)
 

@@ -42,7 +42,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: AddStudentDi
       const accessToken = crypto.randomUUID()
 
       // 학생 추가
-      const { data, error: insertError } = await supabase
+      const { data, error: insertError } = await (supabase as any)
         .from('users')
         .insert({
           name: formData.name,

@@ -2,26 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-
-interface Question {
-  wordId: number
-  word: string
-  correctAnswer: string
-  options: string[]  // 4개 선택지 (정답 + 오답 3개)
-}
-
-interface TestResult {
-  score: number
-  correctCount: number
-  totalQuestions: number
-  wrongWords: {
-    wordId: number
-    word: string
-    studentAnswer: string
-    correctAnswer: string
-  }[]
-  correctWords: string[]
-}
+import type { Question, TestResult } from '@/types/test'
 
 export function useOnlineTest(
   completedWordlistId: string,
@@ -47,7 +28,7 @@ export function useOnlineTest(
           .from('completed_wordlists')
           .select('word_ids, unknown_word_ids, student_id, session_number')
           .eq('id', completedWordlistId)
-          .single()
+          .single<{ word_ids: number[]; unknown_word_ids: number[] | null; student_id: string; session_number: number }>()
 
         if (wordlistError) throw wordlistError
         if (!wordlistData) throw new Error('완성 단어장을 찾을 수 없습니다')
@@ -81,8 +62,10 @@ export function useOnlineTest(
           .from('words')
           .select('id, word_text, meaning')
           .in('id', selectedIds)
+          .returns<{ id: number; word_text: string; meaning: string }[]>()
 
         if (wordsError) throw wordsError
+        if (!wordsData || wordsData.length === 0) throw new Error('단어 정보를 찾을 수 없습니다')
 
         // 4. 질문 형식으로 변환 (객관식 선택지 생성)
         const questionList: Question[] = wordsData.map(word => {
@@ -194,11 +177,11 @@ export function useOnlineTest(
         .from('completed_wordlists')
         .select('student_id')
         .eq('id', completedWordlistId)
-        .single()
+        .single<{ student_id: string }>()
 
       if (completedWordlist) {
         // online_tests 테이블에 저장
-        await supabase.from('online_tests').insert({
+        await (supabase as any).from('online_tests').insert({
           student_id: completedWordlist.student_id,
           completed_wordlist_id: completedWordlistId,
           test_type: testType,  // ⭐ O-TEST('known') 또는 X-TEST('unknown')
@@ -210,7 +193,7 @@ export function useOnlineTest(
         })
 
         // completed_wordlists 업데이트
-        await supabase
+        await (supabase as any)
           .from('completed_wordlists')
           .update({
             online_test_completed: true,

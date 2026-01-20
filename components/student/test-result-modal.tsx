@@ -21,7 +21,7 @@ interface TestResultModalProps {
   onClose: () => void
   sessionNumber: number
   testType: 'known' | 'unknown'
-  wrongWordIds: string[] | null
+  wrongWordIds: number[] | null
 }
 
 export function TestResultModal({

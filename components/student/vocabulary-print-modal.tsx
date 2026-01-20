@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Loader2, Printer } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { CompletedWordlist } from '@/types/database'
 
 interface Word {
   id: string
@@ -175,10 +176,12 @@ export function VocabularyPrintModal({
       // 아는/모르는 단어장 (sessionIds 사용)
       if (sessionIds && sessionIds.length > 0) {
         // 여러 회차의 데이터 가져오기
+        type SessionData = Pick<CompletedWordlist, 'id' | 'word_ids' | 'unknown_word_ids'>
         const { data: sessions, error: sessionsError } = await supabase
           .from('completed_wordlists')
           .select('id, word_ids, unknown_word_ids')
           .in('id', sessionIds)
+          .returns<SessionData[]>()
 
         if (sessionsError) throw sessionsError
 
@@ -191,7 +194,7 @@ export function VocabularyPrintModal({
         console.log('가져온 세션들:', sessions)
 
         // 타입에 따라 단어 ID 수집
-        const wordIds: string[] = []
+        const wordIds: number[] = []
         sessions.forEach(session => {
           if (type === 'known' && session.word_ids) {
             wordIds.push(...session.word_ids)

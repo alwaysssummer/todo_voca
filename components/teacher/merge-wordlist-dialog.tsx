@@ -110,16 +110,17 @@ export function MergeWordlistDialog({
           .from('wordlists')
           .select('id, name, total_words')
           .eq('id', id)
-          .single()
-        
+          .single<{ id: string; name: string; total_words: number }>()
+
         if (error) throw error
-        
+        if (!wordlist) continue
+
         wordlistsData.push({
           id: wordlist.id,
           name: wordlist.name,
           totalWords: wordlist.total_words
         })
-        
+
         total += wordlist.total_words
       }
       
@@ -208,7 +209,7 @@ export function MergeWordlistDialog({
       
       const teacherId = sessionStorage.getItem('teacher_id') || localStorage.getItem('teacher_id')
       
-      const { data: newWordlist, error: wordlistError } = await supabase
+      const { data: newWordlist, error: wordlistError } = await (supabase as any)
         .from('wordlists')
         .insert({
           name: trimmedName,
@@ -242,20 +243,20 @@ export function MergeWordlistDialog({
       try {
         for (let i = 0; i < wordsToInsert.length; i += BATCH_SIZE) {
           const batch = wordsToInsert.slice(i, i + BATCH_SIZE)
-          const { error: insertError } = await supabase
+          const { error: insertError } = await (supabase as any)
             .from('words')
             .insert(batch)
-          
+
           if (insertError) throw insertError
         }
       } catch (insertError: any) {
         // 롤백: 단어장 삭제 (CASCADE로 단어도 자동 삭제)
         console.error('단어 INSERT 실패, 롤백 중...')
-        await supabase
+        await (supabase as any)
           .from('wordlists')
           .delete()
           .eq('id', newWordlist.id)
-        
+
         throw insertError
       }
       

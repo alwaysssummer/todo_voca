@@ -13,8 +13,12 @@ export async function POST(request: NextRequest) {
     console.log('🔑 [TTS] API Key length:', apiKey?.length)
     
     if (!apiKey) {
-      console.error('❌ [TTS] GOOGLE_CLOUD_TTS_API_KEY is not configured')
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
+      // API 키 미설정은 운영상 정상적인 상황일 수 있음 (브라우저 TTS 폴백 사용)
+      console.warn('⚠️ [TTS] GOOGLE_CLOUD_TTS_API_KEY 미설정 - 클라이언트에서 브라우저 TTS 사용')
+      return NextResponse.json(
+        { error: 'TTS API key not configured - using browser fallback' },
+        { status: 503 }
+      )
     }
 
     const response = await fetch(

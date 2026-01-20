@@ -24,6 +24,7 @@ import {
   Printer
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { User, Wordlist as WordlistDB, StudentWordlist } from '@/types/database'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
 import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialog'
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
@@ -59,13 +60,13 @@ interface DashboardStats {
 interface Student {
   id: string
   name: string
-  email: string
+  email: string | null
   progress: number
   completedSessions: number    // 학습 완료 회차
   totalSessions: number        // 학습 전체 회차
   oTestCompleted: number       // O-TEST 완료 회차
   xTestCompleted: number       // X-TEST 완료 회차
-  accessToken: string
+  accessToken: string | null
   displayOrder: number         // 표시 순서
 }
 
@@ -238,11 +239,13 @@ export default function TeacherDashboard() {
   const loadDashboardData = async () => {
     try {
       // 학생 데이터 가져오기 (display_order로 정렬)
+      type StudentData = Pick<User, 'id' | 'name' | 'email' | 'access_token' | 'daily_goal'> & { display_order?: number }
       const { data: studentsData, error: studentsError } = await supabase
         .from('users')
         .select('id, name, email, access_token, daily_goal, display_order')
         .eq('role', 'student')
         .order('display_order', { ascending: true })
+        .returns<StudentData[]>()
 
       if (studentsError) throw studentsError
 
@@ -256,10 +259,12 @@ export default function TeacherDashboard() {
             .eq('student_id', student.id)
 
           // 2. 학습 전체 회차 계산 (배정된 단어장의 총 회차)
+          type AssignmentData = Pick<StudentWordlist, 'wordlist_id' | 'daily_goal'>
           const { data: assignments } = await supabase
             .from('student_wordlists')
             .select('wordlist_id, daily_goal')
             .eq('student_id', student.id)
+            .returns<AssignmentData[]>()
 
           let totalSessions = 0
           if (assignments && assignments.length > 0) {
@@ -268,8 +273,8 @@ export default function TeacherDashboard() {
                 .from('wordlists')
                 .select('total_words')
                 .eq('id', assignment.wordlist_id)
-                .single()
-              
+                .single<Pick<WordlistDB, 'total_words'>>()
+
               if (wordlist && assignment.daily_goal > 0) {
                 totalSessions += Math.ceil(wordlist.total_words / assignment.daily_goal)
               }
@@ -295,6 +300,7 @@ export default function TeacherDashboard() {
             .from('completed_wordlists')
             .select('unknown_word_ids')
             .eq('student_id', student.id)
+            .returns<{ unknown_word_ids: number[] | null }[]>()
 
           const autoCompleted = allCompleted?.filter(
             item => !item.unknown_word_ids || item.unknown_word_ids.length === 0
@@ -333,10 +339,12 @@ export default function TeacherDashboard() {
       setStudents(studentsWithProgress)
 
       // 단어장 데이터 가져오기 (display_order로 정렬)
+      type WordlistData = Pick<WordlistDB, 'id' | 'name' | 'total_words'> & { display_order?: number }
       const { data: wordlistsData, error: wordlistsError } = await supabase
         .from('wordlists')
         .select('id, name, total_words, display_order')
         .order('display_order', { ascending: true })
+        .returns<WordlistData[]>()
 
       if (wordlistsError) throw wordlistsError
 
@@ -539,7 +547,7 @@ export default function TeacherDashboard() {
     }
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('wordlists')
         .update({ name: editingWordlistName.trim() })
         .eq('id', editingWordlistId)
@@ -578,7 +586,7 @@ export default function TeacherDashboard() {
     }
 
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('users')
         .update({ name: editingStudentName.trim() })
         .eq('id', editingStudentId)
@@ -820,7 +828,7 @@ export default function TeacherDashboard() {
       }))
 
       for (const update of updates) {
-        await supabase
+        await (supabase as any)
           .from('users')
           .update({ display_order: update.display_order })
           .eq('id', update.id)
@@ -862,7 +870,7 @@ export default function TeacherDashboard() {
       }))
 
       for (const update of updates) {
-        await supabase
+        await (supabase as any)
           .from('wordlists')
           .update({ display_order: update.display_order })
           .eq('id', update.id)
@@ -1135,8 +1143,9 @@ export default function TeacherDashboard() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => openStudentDashboard(student.accessToken)}
+                                onClick={() => student.accessToken && openStudentDashboard(student.accessToken)}
                                 className="gap-2"
+                                disabled={!student.accessToken}
                               >
                                 <Eye className="w-3 h-3" />
                                 D

@@ -29,9 +29,10 @@ export function useTTS() {
 
       if (!response.ok) {
         const error = await response.json()
-        console.error('❌ [useTTS] TTS API 요청 실패:', error)
-        console.error('❌ [useTTS] Status:', response.status)
-        throw new Error(error.error || 'TTS request failed')
+        // API 키 미설정 등 예상 가능한 에러는 warn 레벨로 처리
+        const errorMsg = error.error || 'TTS request failed'
+        console.warn('⚠️ [useTTS] TTS API 사용 불가:', errorMsg, `(status: ${response.status})`)
+        throw new Error(errorMsg)
       }
       
       console.log('✅ [useTTS] TTS API 응답 성공')
@@ -57,9 +58,8 @@ export function useTTS() {
       
       await audio.play()
     } catch (error) {
-      console.error('❌ [useTTS] TTS 에러 발생:', error)
-      console.warn('⚠️ [useTTS] 브라우저 기본 TTS로 폴백')
-      // 에러 시 브라우저 기본 TTS로 폴백
+      // TTS API 실패는 예상 가능한 상황이므로 warn 레벨로 처리 (폴백이 정상 동작함)
+      console.warn('⚠️ [useTTS] TTS API 실패 → 브라우저 기본 TTS로 폴백')
       fallbackSpeak(text)
     } finally {
       isLoadingRef.current = false

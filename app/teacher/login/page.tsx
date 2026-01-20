@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { BookOpen, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { User } from '@/types/database'
 
 export default function TeacherLoginPage() {
   const router = useRouter()
@@ -30,10 +31,10 @@ export default function TeacherLoginPage() {
       // Supabase에서 강사 확인
       const { data: teacher, error: dbError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, name, password_hash')
         .eq('email', emailToSearch)
         .eq('role', 'teacher')
-        .single()
+        .single<Pick<User, 'id' | 'name' | 'password_hash'>>()
 
       if (dbError || !teacher) {
         setError('이메일 또는 비밀번호가 올바르지 않습니다')

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import type { User } from '@/types/database'
 
 export default function HomePage() {
   const router = useRouter()
@@ -22,10 +23,10 @@ export default function HomePage() {
       // 비밀번호로 강사 찾기
       const { data: teacher, error: dbError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, name')
         .eq('password_hash', password)
         .eq('role', 'teacher')
-        .single()
+        .single<Pick<User, 'id' | 'name'>>()
 
       if (dbError || !teacher) {
         setError('비밀번호가 올바르지 않습니다')

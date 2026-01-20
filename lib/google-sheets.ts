@@ -1,17 +1,10 @@
 import Papa from 'papaparse'
+import type { SheetData, SheetRow, ParsedSheetWord } from '@/types/database'
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
 
-interface SheetData {
-  title: string
-  words: Array<{
-    word_text: string
-    meaning: string
-    example?: string
-    example_translation?: string
-    mnemonic?: string
-  }>
-}
+// Re-export for backwards compatibility
+export type { SheetData }
 
 // URL에서 Spreadsheet ID 추출
 export function extractSpreadsheetId(url: string): string | null {
@@ -95,13 +88,17 @@ export async function fetchSheetData(sheetUrl: string): Promise<SheetData> {
     const dataRows = rows.slice(1)
     
     // 컬럼 순서: A=word_text, B=meaning, C=mnemonic, D=example, E=example_translation
-    const words = dataRows.map((row: any[]) => ({
-      word_text: row[0]?.toString().trim() || '',
-      meaning: row[1]?.toString().trim() || '',
-      mnemonic: row[2]?.toString().trim() || undefined,
-      example: row[3]?.toString().trim() || undefined,
-      example_translation: row[4]?.toString().trim() || undefined
-    })).filter((word: any) => word.word_text && word.meaning) // 필수값이 있는 행만 포함
+    const words: ParsedSheetWord[] = dataRows
+      .map((row: SheetRow): ParsedSheetWord => ({
+        word_text: row[0]?.toString().trim() || '',
+        meaning: row[1]?.toString().trim() || '',
+        mnemonic: row[2]?.toString().trim() || undefined,
+        example: row[3]?.toString().trim() || undefined,
+        example_translation: row[4]?.toString().trim() || undefined
+      }))
+      .filter((word: ParsedSheetWord): word is ParsedSheetWord =>
+        Boolean(word.word_text && word.meaning)
+      ) // 필수값이 있는 행만 포함
     
     if (words.length === 0) {
       throw new Error('유효한 단어가 없습니다. A열(영단어)과 B열(뜻)을 확인해주세요.')
@@ -111,7 +108,7 @@ export async function fetchSheetData(sheetUrl: string): Promise<SheetData> {
     title,
       words
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('시트 불러오기 실패:', error)
     throw error
   }

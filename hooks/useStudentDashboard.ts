@@ -2,44 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-
-interface DashboardData {
-  student: {
-    id: string
-    name: string
-    session_goal: number  // 회차당 목표
-  }
-  currentAssignment: {
-    id: string
-    generation: number
-    wordlist_id: string
-    wordlist_name: string
-    total_words: number
-    completed_words: number
-    filtered_word_ids: string[] | null
-  }
-  completedSessions: Array<{
-    id: string
-    session_number: number  // 회차 번호
-    generation: number
-    word_count: number
-    unknown_count: number  // 모른다 단어 개수
-    completed_date: string
-    test_completed: boolean
-    test_score: number | null
-    assignment_id: string
-    // O-TEST (아는 단어 평가)
-    o_test_completed: boolean
-    o_test_correct: number | null
-    o_test_total: number | null
-    o_test_wrong_word_ids: string[] | null
-    // X-TEST (모르는 단어 평가)
-    x_test_completed: boolean
-    x_test_correct: number | null
-    x_test_total: number | null
-    x_test_wrong_word_ids: string[] | null
-  }>
-}
+import type { OnlineTest, StudentWordlistWithWordlist, DashboardData } from '@/types/database'
 
 export function useStudentDashboard(token: string) {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -55,7 +18,7 @@ export function useStudentDashboard(token: string) {
           .select('id, name, daily_goal')
           .eq('access_token', token)
           .eq('role', 'student')
-          .single()
+          .single<{ id: string; name: string; daily_goal: number }>()
 
         if (studentError) throw studentError
         if (!student) throw new Error('학생을 찾을 수 없습니다')
@@ -76,7 +39,7 @@ export function useStudentDashboard(token: string) {
           .eq('student_id', student.id)
           .order('generation', { ascending: false })
           .limit(1)
-          .single()
+          .single() as { data: StudentWordlistWithWordlist | null; error: any }
 
         if (assignmentError) throw assignmentError
         if (!assignment) throw new Error('배정된 단어장이 없습니다')
@@ -95,6 +58,17 @@ export function useStudentDashboard(token: string) {
         const { count: completedCount } = await completedQuery
 
         // 4. 완성된 회차 목록 (모든 세대)
+        type CompletedSessionRow = {
+          id: string
+          session_number: number
+          generation: number
+          assignment_id: string
+          word_ids: number[]
+          unknown_word_ids: number[] | null
+          completed_date: string
+          online_test_completed: boolean
+          online_tests: OnlineTest[] | null
+        }
         const { data: completedSessions, error: sessionsError } = await supabase
           .from('completed_wordlists')
           .select(`
@@ -116,14 +90,16 @@ export function useStudentDashboard(token: string) {
           `)
           .eq('student_id', student.id)
           .order('session_number', { ascending: false })  // ⭐ 최신순으로 정렬
+          .returns<CompletedSessionRow[]>()
 
         if (sessionsError) throw sessionsError
 
         // 완성된 회차 데이터 변환
         const formattedSessions = (completedSessions || []).map(session => {
           // O-TEST, X-TEST 분리
-          const oTest = session.online_tests?.find((t: any) => t.test_type === 'known')
-          const xTest = session.online_tests?.find((t: any) => t.test_type === 'unknown')
+          const tests = session.online_tests as OnlineTest[] | null
+          const oTest = tests?.find((t) => t.test_type === 'known')
+          const xTest = tests?.find((t) => t.test_type === 'unknown')
           
           return {
             id: session.id,
@@ -149,7 +125,8 @@ export function useStudentDashboard(token: string) {
         })
 
         // Supabase 관계형 데이터 안전하게 접근
-        const wordlistData = (assignment as any).wordlists
+        const assignmentWithWordlist = assignment as unknown as StudentWordlistWithWordlist
+        const wordlistData = assignmentWithWordlist.wordlists
         
         setData({
           student: {
@@ -170,15 +147,16 @@ export function useStudentDashboard(token: string) {
         })
 
         setLoading(false)
-      } catch (err: any) {
+      } catch (err) {
         console.error('대시보드 로드 실패:', err)
+        const error = err as Error & { code?: string; details?: string; hint?: string }
         console.error('에러 상세:', {
-          message: err?.message,
-          code: err?.code,
-          details: err?.details,
-          hint: err?.hint
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
         })
-        setError(err as Error)
+        setError(error)
         setLoading(false)
       }
     }
