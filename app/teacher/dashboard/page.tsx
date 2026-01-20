@@ -184,57 +184,10 @@ export default function TeacherDashboard() {
   const [printWordlistTitle, setPrintWordlistTitle] = useState('')
 
   useEffect(() => {
-    console.log('🔍 [Dashboard] 로그인 상태 확인 중...')
-    
-    // 로그인 확인 (sessionStorage 우선, 없으면 localStorage 확인)
-    let teacherId = sessionStorage.getItem('teacher_id')
-    let name = sessionStorage.getItem('teacher_name')
-    
-    console.log('📦 [Dashboard] sessionStorage:', { teacherId, name })
-    
-    // sessionStorage에 없으면 localStorage 확인 (자동 로그인)
-    if (!teacherId || !name) {
-      console.log('💾 [Dashboard] sessionStorage 없음, localStorage 확인 중...')
-      
-      teacherId = localStorage.getItem('teacher_id')
-      name = localStorage.getItem('teacher_name')
-      const loginTime = localStorage.getItem('teacher_login_time')
-      
-      console.log('💾 [Dashboard] localStorage:', { teacherId, name, loginTime })
-      
-      // localStorage 확인
-      if (teacherId && name && loginTime) {
-        // 30일 만료 체크
-        const daysPassed = (Date.now() - parseInt(loginTime)) / (1000 * 60 * 60 * 24)
-        console.log('⏰ [Dashboard] 로그인 경과일:', daysPassed.toFixed(2), '일')
-        
-        if (daysPassed > 30) {
-          // 만료됨 - localStorage 정리 후 로그인 페이지로
-          console.log('❌ [Dashboard] 로그인 만료 (30일 초과)')
-          localStorage.removeItem('teacher_id')
-          localStorage.removeItem('teacher_name')
-          localStorage.removeItem('teacher_login_time')
-          router.push('/teacher/login')
-          return
-        }
-        
-        // 유효하면 sessionStorage에도 복사 (성능 최적화)
-        console.log('✅ [Dashboard] localStorage 유효, sessionStorage에 복사')
-        sessionStorage.setItem('teacher_id', teacherId)
-        sessionStorage.setItem('teacher_name', name)
-      }
-    }
-    
-    if (!teacherId || !name) {
-      console.log('🚫 [Dashboard] 로그인 정보 없음, 로그인 페이지로 이동')
-      router.push('/teacher/login')
-      return
-    }
-
-    console.log('✅ [Dashboard] 로그인 확인 완료:', { teacherId, name })
-    setTeacherName(name)
+    // 개인용: 로그인 없이 바로 접속
+    setTeacherName('관리자')
     loadDashboardData()
-  }, [router])
+  }, [])
 
   const loadDashboardData = async () => {
     try {
