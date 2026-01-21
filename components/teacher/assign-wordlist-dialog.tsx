@@ -207,8 +207,8 @@ export function AssignWordlistDialog({
 
       // ⭐ 5. 새로운 배정 추가
       if (selectedWordlists.length > 0) {
-        // ⭐ daily_goal을 20~100 범위로 클램프 (DB 제약조건: CHECK (daily_goal BETWEEN 20 AND 100))
-        const clampedDailyGoal = Math.max(20, Math.min(100, student.daily_goal || 20))
+        // ⭐ daily_goal을 5~100 범위로 클램프 (DB 제약조건: CHECK (daily_goal BETWEEN 5 AND 100))
+        const clampedDailyGoal = Math.max(5, Math.min(100, student.daily_goal || 20))
 
         const assignmentsToInsert = selectedWordlists.map(wordlistId => ({
           student_id: studentId,

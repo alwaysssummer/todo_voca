@@ -344,8 +344,8 @@ export function useStudySession(token: string) {
     }
 
     try {
-      const currentSession = progress.session  // ⭐ 현재 회차
-      
+      const currentSession = currentAssignment.current_session  // ⭐ DB에서 가져온 실제 회차 (progress.session은 비동기 업데이트 전일 수 있음)
+
       console.log('🔍 get_next_word 호출:', {
         student_id: student.id,
         assignment_id: currentAssignment.id,
@@ -687,9 +687,8 @@ export function useStudySession(token: string) {
 
   // daily_goal 자동 계산
   const calculateDailyGoal = (wordCount: number): number => {
-    // ⭐ 최소 20개, 최대 100개 (DB 제약 조건: CHECK (daily_goal BETWEEN 20 AND 100))
-    if (wordCount <= 20) return 20  // 최소값 보장
-    if (wordCount <= 30) return Math.min(wordCount, 30)
+    // ⭐ 최소 5개, 최대 100개 (DB 제약 조건: CHECK (daily_goal BETWEEN 5 AND 100))
+    if (wordCount <= 30) return Math.max(5, Math.min(wordCount, 30))  // 5~30개는 단어 수만큼
     if (wordCount <= 100) return 30
     if (wordCount <= 300) return 40
     return 50
