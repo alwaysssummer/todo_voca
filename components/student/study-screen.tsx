@@ -14,7 +14,12 @@ import { GenerationCompleteModal } from './generation-complete-modal'
 import { Loader2, Volume2 } from 'lucide-react'
 import type { Word } from '@/types/word'
 
-export function StudyScreen({ token }: { token: string }) {
+interface StudyScreenProps {
+  token: string
+  assignmentId?: string
+}
+
+export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   const {
     student,
     currentAssignment,
@@ -33,7 +38,7 @@ export function StudyScreen({ token }: { token: string }) {
     setShowGenerationCompleteModal,
     generationModalData,
     setGenerationModalData
-  } = useStudySession(token)
+  } = useStudySession(token, assignmentId)
 
   // TTS (발음 재생)
   const { speak, isPlaying, isLoading: ttsLoading } = useTTS()

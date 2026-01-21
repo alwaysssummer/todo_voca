@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { 
-  BookOpen, 
-  Loader2, 
-  AlertCircle, 
+import {
+  BookOpen,
+  Loader2,
+  AlertCircle,
   CheckCircle2,
   XCircle,
   Calendar,
@@ -28,12 +28,31 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
   const { data, loading, error } = useStudentDashboard(token)
 
   const completedSessionsRaw = data?.completedSessions ?? []
-  const currentAssignmentId = data?.currentAssignment?.id ?? null
+  const assignments = data?.assignments ?? []
+
+  // 탭 선택 상태
+  const [selectedTabIndex, setSelectedTabIndex] = useState<number>(0)
+
+  // 선택된 단어장
+  const selectedAssignment = assignments[selectedTabIndex] || assignments[0] || null
+
+  // 선택된 단어장 및 관련 단어장(같은 base_wordlist_id)의 세션 필터링
+  const getSessionsForAssignment = useCallback((assignment: typeof selectedAssignment) => {
+    if (!assignment) return []
+
+    const baseId = assignment.base_wordlist_id || assignment.wordlist_id
+    const relatedAssignmentIds = assignments
+      .filter(a => (a.base_wordlist_id || a.wordlist_id) === baseId)
+      .map(a => a.id)
+
+    return completedSessionsRaw.filter(session =>
+      relatedAssignmentIds.includes(session.assignment_id)
+    )
+  }, [assignments, completedSessionsRaw])
 
   const filteredCompletedSessions = useMemo(() => {
-    if (!currentAssignmentId) return completedSessionsRaw
-    return completedSessionsRaw.filter(session => session.assignment_id === currentAssignmentId)
-  }, [completedSessionsRaw, currentAssignmentId])
+    return getSessionsForAssignment(selectedAssignment)
+  }, [selectedAssignment, getSessionsForAssignment])
 
   const sessions = useMemo(() => {
     const uniqueMap = new Map<string, (typeof filteredCompletedSessions)[number]>()
@@ -58,7 +77,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
       return a.session_number - b.session_number
     })
   }, [filteredCompletedSessions])
-  
+
   // 모르는 단어 모달 state
   const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
   const [selectedSession, setSelectedSession] = useState<{
@@ -126,41 +145,77 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
     )
   }
 
-  const { student, currentAssignment } = data
-  
+  const { student } = data
+
+  if (!selectedAssignment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <h2 className="font-semibold text-destructive">단어장 없음</h2>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              배정된 단어장이 없습니다. 선생님에게 문의해주세요.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // ⭐ 통계 계산
   const completedSessionsCount = sessions.length
   const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
-  const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
-  
-  const isGenerationCompleted = currentAssignment.completed_words >= currentAssignment.total_words
+  const totalSessions = Math.ceil(selectedAssignment.total_words / student.session_goal)
+
+  const isGenerationCompleted = selectedAssignment.completed_words >= selectedAssignment.total_words
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* 헤더 - 모바일 최적화 */}
-      <header className="bg-white border-b shadow-sm">
+      <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-semibold text-base truncate">{student.name}</span>
-              <span className="text-muted-foreground flex-shrink-0">·</span>
-              <span className="text-sm text-muted-foreground truncate">{currentAssignment.wordlist_name}</span>
-            </div>
+            <span className="font-semibold text-base">{student.name}</span>
           </div>
         </div>
+
+        {/* 단어장 탭 - 2개 이상일 때만 표시 */}
+        {assignments.length > 1 && (
+          <div className="flex border-t">
+            {assignments.map((assignment, index) => (
+              <button
+                key={assignment.id}
+                onClick={() => setSelectedTabIndex(index)}
+                className={`flex-1 px-2 py-2.5 text-sm truncate transition-colors ${
+                  selectedTabIndex === index
+                    ? 'text-blue-600 border-b-2 border-blue-600 font-medium bg-blue-50/50'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {assignment.wordlist_name.length > 12
+                  ? assignment.wordlist_name.slice(0, 12) + '...'
+                  : assignment.wordlist_name
+                }
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* 메인 콘텐츠 */}
       <main className="px-4 py-4">
 
         {/* 학습 버튼 - 모바일 최적화 */}
-        <Button 
-          size="lg" 
+        <Button
+          size="lg"
           className="w-full h-16 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-base"
           onClick={() => {
             sessionStorage.setItem('dashboardMode', 'mobile')
-            router.push(`/s/${token}/mobile/study`)
+            router.push(`/s/${token}/mobile/study?assignment=${selectedAssignment.id}`)
           }}
           disabled={isGenerationCompleted}
         >
@@ -175,13 +230,13 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
               <span className="text-lg font-semibold">{currentSession}/{totalSessions}</span>
               <div className="flex-1 flex items-center gap-2">
                 <div className="flex-1 h-2.5 bg-white/20 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-white rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%` }}
+                    style={{ width: `${Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%` }}
                   />
                 </div>
                 <span className="text-base font-medium min-w-[3rem] text-right">
-                  {Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%
+                  {Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%
                 </span>
               </div>
             </div>
@@ -203,7 +258,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                 {sessions.map((session) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
-                  
+
                   return (
                     <Card key={session.id} className="hover:shadow-md transition-shadow border-2">
                       <CardContent className="p-4">
@@ -236,12 +291,12 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                               <CheckCircle2 className="w-5 h-5" />
                               <span className="text-base font-semibold">{knownCount}</span>
                             </Button>
-                            
+
                             {/* O-TEST 평가 상태 */}
                             <div className="flex items-center justify-center min-w-[5rem]">
                               {session.o_test_completed ? (
                                 // 평가 완료: 점수 표시 (클릭 가능)
-                                <div 
+                                <div
                                   className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
                                   onClick={() => handleViewTestResult(
                                     session.session_number,
@@ -270,7 +325,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* X-TEST 영역 */}
                         <div>
                           <div className="flex items-center justify-between">
@@ -293,7 +348,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                               <XCircle className="w-5 h-5" />
                               <span className="text-base font-semibold">{unknownCount}</span>
                             </Button>
-                            
+
                             {/* X-TEST 평가 상태 */}
                             <div className="flex items-center justify-center min-w-[5rem]">
                               {unknownCount === 0 ? (
@@ -306,7 +361,7 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
                                 </div>
                               ) : session.x_test_completed ? (
                                 // 평가 완료: 점수 표시 (클릭 가능)
-                                <div 
+                                <div
                                   className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
                                   onClick={() => handleViewTestResult(
                                     session.session_number,
@@ -389,4 +444,3 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
     </div>
   )
 }
-

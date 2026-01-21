@@ -26,7 +26,6 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { User, Wordlist as WordlistDB, StudentWordlist } from '@/types/database'
 import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
-import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialog'
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
@@ -164,11 +163,8 @@ export default function TeacherDashboard() {
   const [wordlists, setWordlists] = useState<Wordlist[]>([])
   const [loading, setLoading] = useState(true)
   const [addStudentOpen, setAddStudentOpen] = useState(false)
-  const [assignWordlistOpen, setAssignWordlistOpen] = useState(false)
   const [addWordlistOpen, setAddWordlistOpen] = useState(false)
   const [viewWordlistOpen, setViewWordlistOpen] = useState(false)
-  const [selectedStudentId, setSelectedStudentId] = useState('')
-  const [selectedStudentName, setSelectedStudentName] = useState('')
   const [selectedWordlist, setSelectedWordlist] = useState<Wordlist | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [editingWordlistId, setEditingWordlistId] = useState<string | null>(null)
@@ -296,11 +292,12 @@ export default function TeacherDashboard() {
 
       setStudents(studentsWithProgress)
 
-      // 단어장 데이터 가져오기 (display_order로 정렬)
+      // 단어장 데이터 가져오기 (원본 단어장만, 복습 단어장 제외)
       type WordlistData = Pick<WordlistDB, 'id' | 'name' | 'total_words'> & { display_order?: number }
       const { data: wordlistsData, error: wordlistsError } = await supabase
         .from('wordlists')
         .select('id, name, total_words, display_order')
+        .or('is_review.is.null,is_review.eq.false')  // 원본 단어장만 (is_review가 null 또는 false)
         .order('display_order', { ascending: true })
         .returns<WordlistData[]>()
 
@@ -358,12 +355,6 @@ export default function TeacherDashboard() {
   const openStudentDashboard = (token: string) => {
     const link = `${window.location.origin}/s/${token}/dashboard`
     window.open(link, '_blank')
-  }
-
-  const openAssignDialog = (studentId: string, studentName: string) => {
-    setSelectedStudentId(studentId)
-    setSelectedStudentName(studentName)
-    setAssignWordlistOpen(true)
   }
 
   const handleDeleteStudent = async (studentId: string, studentName: string) => {
@@ -1101,15 +1092,6 @@ export default function TeacherDashboard() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => openAssignDialog(student.id, student.name)}
-                                className="gap-2"
-                              >
-                                <BookOpen className="w-3 h-3" />
-                                V
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
                                 onClick={() => student.accessToken && openStudentDashboard(student.accessToken)}
                                 className="gap-2"
                                 disabled={!student.accessToken}
@@ -1363,15 +1345,6 @@ export default function TeacherDashboard() {
         onSuccess={loadDashboardData}
       />
 
-      {/* 단어장 배정 다이얼로그 */}
-      <AssignWordlistDialog
-        open={assignWordlistOpen}
-        onOpenChange={setAssignWordlistOpen}
-        studentId={selectedStudentId}
-        studentName={selectedStudentName}
-        onSuccess={loadDashboardData}
-      />
-
       {/* 단어장 추가 다이얼로그 */}
       <AddWordlistDialog
         open={addWordlistOpen}
@@ -1425,9 +1398,6 @@ export default function TeacherDashboard() {
           studentId={selectedStudentForManagement.id}
           studentName={selectedStudentForManagement.name}
           accessToken={selectedStudentForManagement.accessToken || ''}
-          onAssignWordlist={() => {
-            openAssignDialog(selectedStudentForManagement.id, selectedStudentForManagement.name)
-          }}
           onDataChanged={loadDashboardData}
         />
       )}

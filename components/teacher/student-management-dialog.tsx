@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Loader2,
   Copy,
@@ -25,7 +26,7 @@ import {
   ChevronDown,
   ChevronRight,
   Settings,
-  Plus,
+  Save,
 } from 'lucide-react'
 
 interface StudentManagementDialogProps {
@@ -34,8 +35,18 @@ interface StudentManagementDialogProps {
   studentId: string
   studentName: string
   accessToken: string
-  onAssignWordlist: () => void // 단어장 배정 다이얼로그 열기
-  onDataChanged?: () => void // 데이터 변경 시 부모 컴포넌트에 알림
+  onDataChanged?: () => void
+}
+
+interface WordlistInfo {
+  id: string
+  name: string
+  total_words: number
+  isAssigned: boolean
+  assignmentId?: string
+  progressPercent?: number
+  completedWords?: number
+  is_review?: boolean
 }
 
 interface AssignmentWithWordlist {
@@ -73,11 +84,13 @@ export function StudentManagementDialog({
   studentId,
   studentName,
   accessToken,
-  onAssignWordlist,
   onDataChanged,
 }: StudentManagementDialogProps) {
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [assignments, setAssignments] = useState<TreeNode[]>([])
+  const [allWordlists, setAllWordlists] = useState<WordlistInfo[]>([])
+  const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map())
   const [dailyGoal, setDailyGoal] = useState<number>(20)
   const [copiedLink, setCopiedLink] = useState<string | null>(null)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
@@ -87,10 +100,22 @@ export function StudentManagementDialog({
 
   useEffect(() => {
     if (open && studentId) {
-      loadAssignments()
-      loadStudentInfo()
+      loadAllData()
     }
   }, [open, studentId])
+
+  const loadAllData = async () => {
+    setLoading(true)
+    setPendingChanges(new Map())
+    try {
+      await Promise.all([
+        loadStudentInfo(),
+        loadWordlistsWithAssignments(),
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadStudentInfo = async () => {
     const { data } = await supabase
@@ -105,131 +130,215 @@ export function StudentManagementDialog({
     }
   }
 
-  const loadAssignments = async () => {
-    setLoading(true)
-    try {
-      // 1. 학생의 모든 배정 조회
-      interface AssignmentRow {
-        id: string
-        wordlist_id: string
-        generation: number | null
-        is_auto_generated: boolean | null
-        base_wordlist_id: string | null
-        parent_assignment_id: string | null
-        daily_goal: number | null
-        current_session: number | null
-        filtered_word_ids: number[] | null
-        wordlists: {
-          id: string
-          name: string
-          total_words: number
-        } | null
-      }
+  const loadWordlistsWithAssignments = async () => {
+    // 1-1. 원본 단어장 조회 (is_review가 null 또는 false)
+    const { data: originalWordlistsData } = await supabase
+      .from('wordlists')
+      .select('id, name, total_words, is_review')
+      .or('is_review.is.null,is_review.eq.false')
+      .order('display_order', { ascending: true })
 
-      const { data: rawData, error } = await supabase
-        .from('student_wordlists')
-        .select(`
-          id,
-          wordlist_id,
-          generation,
-          is_auto_generated,
-          base_wordlist_id,
-          parent_assignment_id,
-          daily_goal,
-          current_session,
-          filtered_word_ids,
-          wordlists (
-            id,
-            name,
-            total_words
-          )
-        `)
-        .eq('student_id', studentId)
-        .order('assigned_at', { ascending: true })
+    // 1-2. 복습 단어장 조회 (해당 학생용만)
+    const { data: reviewWordlistsData } = await supabase
+      .from('wordlists')
+      .select('id, name, total_words, is_review')
+      .eq('is_review', true)
+      .eq('created_for_student_id', studentId)
+      .order('created_at', { ascending: false })
 
-      if (error) throw error
+    const originalWordlists = (originalWordlistsData as { id: string; name: string; total_words: number; is_review?: boolean }[]) || []
+    const reviewWordlists = (reviewWordlistsData as { id: string; name: string; total_words: number; is_review?: boolean }[]) || []
+    const wordlists = [...originalWordlists, ...reviewWordlists]
 
-      const assignmentsData = rawData as unknown as AssignmentRow[]
-
-      // 2. 각 배정의 통계 조회
-      const statsPromises = (assignmentsData || []).map(async (assignment) => {
-        const wordlistData = assignment.wordlists
-
-        // 단어 수 계산 (filtered_word_ids가 있으면 그 개수, 아니면 total_words)
-        const totalWords = assignment.filtered_word_ids?.length || wordlistData?.total_words || 0
-        const totalSessions = Math.ceil(totalWords / (assignment.daily_goal || 20))
-
-        // 완료한 회차 수
-        const { count: completedSessions } = await supabase
-          .from('completed_wordlists')
-          .select('*', { count: 'exact', head: true })
-          .eq('assignment_id', assignment.id)
-
-        // 완료한 단어 수
-        const { count: completedWords } = await supabase
-          .from('student_word_progress')
-          .select('*', { count: 'exact', head: true })
-          .eq('student_id', studentId)
-          .eq('wordlist_id', assignment.wordlist_id)
-          .eq('status', 'completed')
-
-        // O-TEST 완료 회차
-        const { count: oTestCompleted } = await supabase
-          .from('online_tests')
-          .select('*', { count: 'exact', head: true })
-          .eq('assignment_id', assignment.id)
-          .eq('test_type', 'known')
-
-        // X-TEST 완료 회차
-        const { count: xTestCompleted } = await supabase
-          .from('online_tests')
-          .select('*', { count: 'exact', head: true })
-          .eq('assignment_id', assignment.id)
-          .eq('test_type', 'unknown')
-
-        return {
-          assignment_id: assignment.id,
-          completed_words: completedWords || 0,
-          completed_sessions: completedSessions || 0,
-          total_sessions: totalSessions,
-          o_test_completed: oTestCompleted || 0,
-          x_test_completed: xTestCompleted || 0,
-        }
-      })
-
-      const stats = await Promise.all(statsPromises)
-      const statsMap = new Map(stats.map(s => [s.assignment_id, s]))
-
-      // 3. 트리 구조로 변환
-      const assignmentsList: AssignmentWithWordlist[] = (assignmentsData || []).map(a => {
-        const wordlistData = a.wordlists as { id: string; name: string; total_words: number } | null
-        return {
-          id: a.id,
-          wordlist_id: a.wordlist_id,
-          generation: a.generation || 1,
-          is_auto_generated: a.is_auto_generated || false,
-          base_wordlist_id: a.base_wordlist_id,
-          parent_assignment_id: a.parent_assignment_id,
-          daily_goal: a.daily_goal || 20,
-          current_session: a.current_session || 1,
-          wordlist_name: wordlistData?.name || '알 수 없음',
-          total_words: a.filtered_word_ids?.length || wordlistData?.total_words || 0,
-          filtered_word_ids: a.filtered_word_ids,
-        }
-      })
-
-      const tree = buildTree(assignmentsList, statsMap)
-      setAssignments(tree)
-
-      // 모든 노드 펼치기
-      const allIds = new Set(assignmentsList.map(a => a.id))
-      setExpandedNodes(allIds)
-
-    } catch (error) {
-      console.error('배정 목록 로드 실패:', error)
-    } finally {
-      setLoading(false)
+    // 2. 학생의 배정 조회
+    interface AssignmentRow {
+      id: string
+      wordlist_id: string
+      generation: number | null
+      is_auto_generated: boolean | null
+      base_wordlist_id: string | null
+      parent_assignment_id: string | null
+      daily_goal: number | null
+      current_session: number | null
+      filtered_word_ids: number[] | null
     }
+
+    const { data: assignmentsData } = await supabase
+      .from('student_wordlists')
+      .select(`
+        id,
+        wordlist_id,
+        generation,
+        is_auto_generated,
+        base_wordlist_id,
+        parent_assignment_id,
+        daily_goal,
+        current_session,
+        filtered_word_ids
+      `)
+      .eq('student_id', studentId)
+      .order('assigned_at', { ascending: true })
+
+    const assignmentsList = (assignmentsData as unknown as AssignmentRow[]) || []
+
+    // 배정된 단어장 ID 맵
+    const assignedMap = new Map<string, AssignmentRow>()
+    assignmentsList.forEach(a => {
+      // 원본 단어장 (generation 1이고 is_auto_generated가 false)
+      if (a.generation === 1 && !a.is_auto_generated) {
+        assignedMap.set(a.wordlist_id, a)
+      }
+      // 복습 단어장이 있으면 원본(base_wordlist_id)도 "배정된 것"으로 간주
+      if (a.base_wordlist_id && !assignedMap.has(a.base_wordlist_id)) {
+        assignedMap.set(a.base_wordlist_id, a)
+      }
+    })
+
+    // 3. 배정된 단어장의 진행률 계산
+    const progressPromises = Array.from(assignedMap.entries()).map(async ([wordlistId, assignment]) => {
+      const { count } = await supabase
+        .from('student_word_progress')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .eq('wordlist_id', wordlistId)
+        .eq('status', 'completed')
+
+      return {
+        wordlistId,
+        assignmentId: assignment.id,
+        completedWords: count || 0,
+      }
+    })
+
+    const progressResults = await Promise.all(progressPromises)
+    const progressMap = new Map(progressResults.map(p => [p.wordlistId, p]))
+
+    // 4. 단어장 목록 구성 (원본/복습 구분 포함)
+    const wordlistInfos: WordlistInfo[] = wordlists.map(wl => {
+      const progress = progressMap.get(wl.id)
+      const isAssigned = assignedMap.has(wl.id)
+      return {
+        id: wl.id,
+        name: wl.name,
+        total_words: wl.total_words,
+        isAssigned,
+        assignmentId: progress?.assignmentId,
+        progressPercent: isAssigned ? Math.round((progress?.completedWords || 0) / wl.total_words * 100) : undefined,
+        completedWords: progress?.completedWords,
+        is_review: wl.is_review || false,
+      }
+    })
+
+    setAllWordlists(wordlistInfos)
+
+    // 5. 트리 구조 구성 (기존 배정된 단어장들)
+    await loadAssignmentsTree(assignmentsList, wordlists)
+  }
+
+  const loadAssignmentsTree = async (
+    assignmentsList: any[],
+    wordlists: { id: string; name: string; total_words: number }[]
+  ) => {
+    // 배정된 단어장 ID 목록
+    const assignedWordlistIds = assignmentsList.map(a => a.wordlist_id)
+
+    // 배정된 단어장 중 wordlists에 없는 것들 조회 (삭제된 단어장 등)
+    const missingIds = assignedWordlistIds.filter(id => !wordlists.find(w => w.id === id))
+
+    let allWordlistsData = [...wordlists]
+    if (missingIds.length > 0) {
+      const { data: missingWordlists } = await supabase
+        .from('wordlists')
+        .select('id, name, total_words')
+        .in('id', missingIds)
+
+      if (missingWordlists) {
+        allWordlistsData = [...wordlists, ...(missingWordlists as { id: string; name: string; total_words: number }[])]
+      }
+    }
+
+    const wordlistMap = new Map(allWordlistsData.map(wl => [wl.id, wl]))
+
+    // 통계 조회
+    const statsPromises = assignmentsList.map(async (assignment) => {
+      const wordlistData = wordlistMap.get(assignment.wordlist_id)
+      const totalWords = assignment.filtered_word_ids?.length || wordlistData?.total_words || 0
+      const totalSessions = Math.ceil(totalWords / (assignment.daily_goal || 20))
+
+      const { count: completedSessions } = await supabase
+        .from('completed_wordlists')
+        .select('*', { count: 'exact', head: true })
+        .eq('assignment_id', assignment.id)
+
+      const { count: completedWords } = await supabase
+        .from('student_word_progress')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .eq('wordlist_id', assignment.wordlist_id)
+        .eq('status', 'completed')
+
+      const { count: oTestCompleted } = await supabase
+        .from('online_tests')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .in('completed_wordlist_id',
+          (await supabase
+            .from('completed_wordlists')
+            .select('id')
+            .eq('assignment_id', assignment.id)
+          ).data?.map((c: any) => c.id) || []
+        )
+        .eq('test_type', 'known')
+
+      const { count: xTestCompleted } = await supabase
+        .from('online_tests')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', studentId)
+        .in('completed_wordlist_id',
+          (await supabase
+            .from('completed_wordlists')
+            .select('id')
+            .eq('assignment_id', assignment.id)
+          ).data?.map((c: any) => c.id) || []
+        )
+        .eq('test_type', 'unknown')
+
+      return {
+        assignment_id: assignment.id,
+        completed_words: completedWords || 0,
+        completed_sessions: completedSessions || 0,
+        total_sessions: totalSessions,
+        o_test_completed: oTestCompleted || 0,
+        x_test_completed: xTestCompleted || 0,
+      }
+    })
+
+    const stats = await Promise.all(statsPromises)
+    const statsMap = new Map(stats.map(s => [s.assignment_id, s]))
+
+    // 트리 구조로 변환
+    const assignmentsWithDetails: AssignmentWithWordlist[] = assignmentsList.map(a => {
+      const wordlistData = wordlistMap.get(a.wordlist_id)
+      return {
+        id: a.id,
+        wordlist_id: a.wordlist_id,
+        generation: a.generation || 1,
+        is_auto_generated: a.is_auto_generated || false,
+        base_wordlist_id: a.base_wordlist_id,
+        parent_assignment_id: a.parent_assignment_id,
+        daily_goal: a.daily_goal || 20,
+        current_session: a.current_session || 1,
+        wordlist_name: wordlistData?.name || '알 수 없음',
+        total_words: a.filtered_word_ids?.length || wordlistData?.total_words || 0,
+        filtered_word_ids: a.filtered_word_ids,
+      }
+    })
+
+    const tree = buildTree(assignmentsWithDetails, statsMap)
+    setAssignments(tree)
+
+    const allIds = new Set(assignmentsWithDetails.map(a => a.id))
+    setExpandedNodes(allIds)
   }
 
   const buildTree = (
@@ -239,7 +348,6 @@ export function StudentManagementDialog({
     const nodeMap = new Map<string, TreeNode>()
     const roots: TreeNode[] = []
 
-    // 모든 노드 생성
     assignments.forEach(assignment => {
       nodeMap.set(assignment.id, {
         assignment,
@@ -248,22 +356,17 @@ export function StudentManagementDialog({
       })
     })
 
-    // 트리 구조 구성
     assignments.forEach(assignment => {
       const node = nodeMap.get(assignment.id)!
       if (assignment.parent_assignment_id && nodeMap.has(assignment.parent_assignment_id)) {
-        // 부모가 있으면 부모의 children에 추가
         nodeMap.get(assignment.parent_assignment_id)!.children.push(node)
       } else if (assignment.generation === 1 || !assignment.parent_assignment_id) {
-        // 원본이거나 부모가 없으면 루트에 추가
         roots.push(node)
       } else {
-        // 부모가 삭제된 경우 루트에 추가
         roots.push(node)
       }
     })
 
-    // 각 노드의 children을 generation 순으로 정렬
     const sortChildren = (node: TreeNode) => {
       node.children.sort((a, b) => a.assignment.generation - b.assignment.generation)
       node.children.forEach(sortChildren)
@@ -271,6 +374,62 @@ export function StudentManagementDialog({
     roots.forEach(sortChildren)
 
     return roots
+  }
+
+  // 즉시 저장 방식: 체크박스 클릭 시 바로 DB에 저장
+  const handleToggleWordlist = async (wordlistId: string, currentlyAssigned: boolean) => {
+    const wordlist = allWordlists.find(w => w.id === wordlistId)
+    if (!wordlist) return
+
+    // 로딩 상태 표시
+    setPendingChanges(prev => new Map(prev).set(wordlistId, !currentlyAssigned))
+    setSaving(true)
+
+    try {
+      if (!currentlyAssigned) {
+        // 새로 배정
+        const { data: teacherData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'teacher')
+          .limit(1)
+          .single()
+          .returns<{ id: string }>()
+
+        await (supabase as any).from('student_wordlists').insert({
+          student_id: studentId,
+          wordlist_id: wordlistId,
+          assigned_by: (teacherData as { id: string } | null)?.id,
+          generation: 1,
+          is_auto_generated: false,
+          base_wordlist_id: wordlistId,
+          daily_goal: dailyGoal,
+        })
+      } else {
+        // 배정 해제
+        await supabase
+          .from('student_wordlists')
+          .delete()
+          .eq('student_id', studentId)
+          .eq('wordlist_id', wordlistId)
+          .eq('generation', 1)
+          .eq('is_auto_generated', false)
+      }
+
+      // 즉시 데이터 새로고침
+      await loadAllData()
+      onDataChanged?.()
+
+    } catch (error) {
+      console.error('저장 실패:', error)
+    } finally {
+      setSaving(false)
+      setPendingChanges(new Map())
+    }
+  }
+
+  const getEffectiveAssignmentState = (wordlist: WordlistInfo): boolean => {
+    return wordlist.isAssigned
   }
 
   const copyToClipboard = async (link: string, type: string) => {
@@ -296,17 +455,13 @@ export function StudentManagementDialog({
   }
 
   const handleDeleteAssignment = async (assignment: AssignmentWithWordlist) => {
-    const message = assignment.is_auto_generated
-      ? `"${assignment.wordlist_name}" 배정을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 관련된 모든 학습 기록과 하위 복습 단어장도 함께 삭제됩니다.`
-      : `"${assignment.wordlist_name}" 배정을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 관련된 모든 학습 기록이 삭제됩니다.`
+    const message = `"${assignment.wordlist_name}" 배정을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 관련된 모든 학습 기록과 하위 복습 단어장도 함께 삭제됩니다.`
 
     if (!confirm(message)) return
 
     setDeleting(true)
     try {
-      // 자식 배정들도 함께 삭제 (재귀적으로)
       const deleteRecursively = async (assignmentId: string) => {
-        // 자식 배정 찾기
         const { data: childrenData } = await supabase
           .from('student_wordlists')
           .select('id')
@@ -314,25 +469,19 @@ export function StudentManagementDialog({
 
         const children = childrenData as { id: string }[] | null
 
-        // 자식들 먼저 삭제
         if (children) {
           for (const child of children) {
             await deleteRecursively(child.id)
           }
         }
 
-        // 관련 데이터 삭제
-        await supabase.from('online_tests').delete().eq('assignment_id', assignmentId)
+        await supabase.from('online_tests').delete().eq('student_id', studentId)
         await supabase.from('completed_wordlists').delete().eq('assignment_id', assignmentId)
-
-        // 배정 삭제
         await supabase.from('student_wordlists').delete().eq('id', assignmentId)
       }
 
       await deleteRecursively(assignment.id)
-
-      // 목록 새로고침
-      await loadAssignments()
+      await loadAllData()
       onDataChanged?.()
 
     } catch (error) {
@@ -368,7 +517,6 @@ export function StudentManagementDialog({
       <div key={assignment.id} style={{ marginLeft: depth * 24 }}>
         <Card className={`mb-2 ${assignment.generation === 1 ? 'border-blue-200 bg-blue-50/30' : 'border-orange-200 bg-orange-50/30'}`}>
           <CardContent className="p-4">
-            {/* 헤더 */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {hasChildren && (
@@ -419,7 +567,6 @@ export function StudentManagementDialog({
               </Button>
             </div>
 
-            {/* 진도 */}
             <div className="mb-3">
               <div className="flex items-center justify-between text-sm mb-1">
                 <span className="text-muted-foreground">진도</span>
@@ -430,14 +577,12 @@ export function StudentManagementDialog({
               <Progress value={progressPercent} className="h-2" />
             </div>
 
-            {/* 통계 */}
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
               <span>회차: {stats?.completed_sessions || 0}/{stats?.total_sessions || 0}</span>
               <span>O-TEST: {stats?.o_test_completed || 0}회</span>
               <span>X-TEST: {stats?.x_test_completed || 0}회</span>
             </div>
 
-            {/* 링크 */}
             <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
@@ -471,99 +616,210 @@ export function StudentManagementDialog({
           </CardContent>
         </Card>
 
-        {/* 자식 노드들 */}
         {isExpanded && children.map(child => renderTreeNode(child, depth + 1))}
       </div>
     )
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="text-xl">👤</span>
-              학생 관리: {studentName}
-            </DialogTitle>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <span className="text-xl">👤</span>
+            학생 관리: {studentName}
+          </DialogTitle>
+        </DialogHeader>
 
-          {/* 기본 정보 */}
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-muted-foreground">이름</label>
-                  <div className="font-medium">{studentName}</div>
-                </div>
-                <div>
-                  <label className="text-sm text-muted-foreground">회차목표</label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min={5}
-                      max={100}
-                      value={dailyGoal}
-                      onChange={(e) => handleDailyGoalChange(parseInt(e.target.value) || 20)}
-                      className="w-20 h-8"
-                    />
-                    <span className="text-sm text-muted-foreground">개/회차</span>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3">
-                <label className="text-sm text-muted-foreground">메인 링크</label>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 text-xs bg-muted px-2 py-1 rounded truncate">
-                    {baseUrl}/s/{accessToken}/dashboard
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => copyToClipboard(`${baseUrl}/s/${accessToken}/dashboard`, 'main')}
-                  >
-                    {copiedLink === 'main' ? (
-                      <Check className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 배정된 단어장 */}
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              배정된 단어장
-              <Badge variant="secondary">{assignments.length}개</Badge>
-            </h3>
-            <Button size="sm" onClick={onAssignWordlist} className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              단어장 배정
+        {/* 기본 정보 - 한 줄로 압축 */}
+        <div className="shrink-0 flex items-center gap-4 py-3 px-1 border-b">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">이름:</span>
+            <span className="font-medium">{studentName}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">회차목표:</span>
+            <Input
+              type="number"
+              min={5}
+              max={100}
+              value={dailyGoal}
+              onChange={(e) => handleDailyGoalChange(parseInt(e.target.value) || 20)}
+              className="w-16 h-7 text-sm"
+            />
+            <span className="text-sm text-muted-foreground">개/회차</span>
+          </div>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <code className="text-xs bg-muted px-2 py-1 rounded truncate max-w-xs">
+              {baseUrl}/s/{accessToken}/dashboard
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => copyToClipboard(`${baseUrl}/s/${accessToken}/dashboard`, 'main')}
+            >
+              {copiedLink === 'main' ? (
+                <Check className="h-3 w-3 text-green-600" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
             </Button>
           </div>
+        </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        {/* 2컬럼 레이아웃 */}
+        <div className="flex-1 grid grid-cols-2 gap-4 mt-4 min-h-0">
+          {/* 왼쪽 컬럼: 단어장 배정 */}
+          <div className="border rounded-lg overflow-hidden flex flex-col min-h-0">
+            <div className="shrink-0 p-3 border-b bg-muted/50 flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                📋 단어장 배정
+              </h3>
+              {saving && (
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  저장 중...
+                </div>
+              )}
             </div>
-          ) : assignments.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">배정된 단어장이 없습니다</p>
-                <p className="text-sm mt-1">단어장을 배정해주세요</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {assignments.map(node => renderTreeNode(node))}
+
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto">
+                {/* 원본 단어장 그룹 */}
+                <div className="border-b">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-b sticky top-0">
+                    <BookOpen className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-700">원본 단어장</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {allWordlists.filter(w => !w.is_review).length}개
+                    </Badge>
+                  </div>
+                  <div className="divide-y">
+                    {allWordlists.filter(w => !w.is_review).map(wordlist => {
+                      const isProcessing = pendingChanges.has(wordlist.id)
+
+                      return (
+                        <div
+                          key={wordlist.id}
+                          className={`flex items-center gap-2 p-2 hover:bg-muted/50 cursor-pointer ${isProcessing ? 'opacity-50' : ''}`}
+                          onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                        >
+                          {isProcessing ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Checkbox
+                              checked={wordlist.isAssigned}
+                              disabled={saving}
+                              onCheckedChange={() => handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm font-medium truncate block">{wordlist.name}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {wordlist.total_words}개
+                          </Badge>
+                          {wordlist.isAssigned && wordlist.progressPercent !== undefined && (
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {wordlist.progressPercent}%
+                            </span>
+                          )}
+                          {!wordlist.isAssigned && !isProcessing && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">
+                              미배정
+                            </Badge>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 복습 단어장 그룹 */}
+                {allWordlists.filter(w => w.is_review).length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border-b sticky top-0">
+                      <RefreshCw className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-700">복습 단어장</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {allWordlists.filter(w => w.is_review).length}개
+                      </Badge>
+                    </div>
+                    <div className="divide-y">
+                      {allWordlists.filter(w => w.is_review).map(wordlist => {
+                        const isProcessing = pendingChanges.has(wordlist.id)
+
+                        return (
+                          <div
+                            key={wordlist.id}
+                            className={`flex items-center gap-2 p-2 hover:bg-muted/50 cursor-pointer ${isProcessing ? 'opacity-50' : ''}`}
+                            onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          >
+                            {isProcessing ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Checkbox
+                                checked={wordlist.isAssigned}
+                                disabled={saving}
+                                onCheckedChange={() => handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-medium truncate block">{wordlist.name}</span>
+                            </div>
+                            <Badge variant="secondary" className="text-xs shrink-0">
+                              {wordlist.total_words}개
+                            </Badge>
+                            {wordlist.isAssigned && wordlist.progressPercent !== undefined && (
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {wordlist.progressPercent}%
+                              </span>
+                            )}
+                            {!wordlist.isAssigned && !isProcessing && (
+                              <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">
+                                미배정
+                              </Badge>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 오른쪽 컬럼: 배정된 단어장 상세 */}
+          <div className="border rounded-lg overflow-hidden flex flex-col min-h-0">
+            <div className="shrink-0 p-3 border-b bg-muted/50 flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2">
+                📊 배정된 단어장 상세
+                <Badge variant="secondary">{assignments.length}개</Badge>
+              </h3>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                배정된 단어장이 없습니다
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {assignments.map(node => renderTreeNode(node))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

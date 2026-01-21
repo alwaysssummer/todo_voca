@@ -121,7 +121,7 @@ type Student = SessionStudent
 type Assignment = SessionAssignment
 type Progress = SessionProgress
 
-export function useStudySession(token: string) {
+export function useStudySession(token: string, assignmentId?: string | null) {
   const [student, setStudent] = useState<Student | null>(null)
   const [currentAssignment, setCurrentAssignment] = useState<Assignment | null>(null)
   const [currentWordlist, setCurrentWordlist] = useState<Wordlist | null>(null)
@@ -193,7 +193,10 @@ export function useStudySession(token: string) {
         }
 
         // daily_goal을 session_goal로 매핑, current_session 추가
-        const rawAssignment = assignments[0]
+        // assignmentId가 제공되면 해당 단어장 선택, 없으면 첫 번째 단어장
+        const rawAssignment = assignmentId
+          ? (assignments as RawAssignment[]).find((a: RawAssignment) => a.id === assignmentId) || assignments[0]
+          : assignments[0]
         const assignment: Assignment = {
           ...rawAssignment,
           session_goal: rawAssignment.daily_goal,
@@ -225,7 +228,7 @@ export function useStudySession(token: string) {
     }
 
     fetchStudentAndAssignment()
-  }, [token])
+  }, [token, assignmentId])
 
   // 초기 로딩 완료 후 첫 단어 가져오기
   useEffect(() => {
@@ -737,20 +740,24 @@ export function useStudySession(token: string) {
         return null
       }
 
-      // 3. 새 단어장 생성
+      // 3. 새 단어장 생성 (복습 단어장 플래그 추가)
       const { data: newWordlist, error: wordlistError } = await (supabase as any)
         .from('wordlists')
         .insert({
           name: reviewWordlistName,
           total_words: skippedWords.length,
           created_by: teacherId,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          // 복습 단어장 구분 필드
+          is_review: true,
+          source_wordlist_id: currentWordlist.id,
+          created_for_student_id: student.id
         })
         .select()
         .single()
 
       if (wordlistError) throw wordlistError
-      console.log(`✅ 새 단어장 생성: ${reviewWordlistName} (ID: ${newWordlist.id})`)
+      console.log(`✅ 복습 단어장 생성: ${reviewWordlistName} (ID: ${newWordlist.id})`)
 
       // 4. 새 단어장에 단어 추가
       const newWords = skippedWords.map((word: any, index: number) => ({
@@ -770,31 +777,13 @@ export function useStudySession(token: string) {
       if (insertWordsError) throw insertWordsError
       console.log(`✅ ${newWords.length}개 단어 추가 완료`)
 
-      // 5. 학생에게 자동 배정
-      const suggestedDailyGoal = calculateDailyGoal(skippedWords.length)
-      const { data: newAssignment, error: assignError } = await (supabase as any)
-        .from('student_wordlists')
-        .insert({
-          student_id: student.id,
-          wordlist_id: newWordlist.id,
-          base_wordlist_id: newWordlist.id,  // ⭐ 새 단어장이 base가 됨
-          generation: 1,  // 독립적인 단어장
-          parent_assignment_id: null,  // 독립적인 단어장
-          filtered_word_ids: null,  // 전체 단어 학습
-          daily_goal: suggestedDailyGoal,
-          is_auto_generated: true,
-          assigned_by: teacherId,
-          assigned_at: new Date().toISOString()
-        })
-        .select()
-        .single()
-
-      if (assignError) throw assignError
-      console.log(`✅ 복습 단어장 자동 배정 완료 (일일 목표: ${suggestedDailyGoal}개)`)
+      // 5. 복습 단어장은 생성만 하고 배정하지 않음
+      // → 강사가 학생 관리 모달에서 명시적으로 배정해야 학생이 학습 가능
+      console.log(`📋 복습 단어장 생성 완료 (배정 대기 중 - 강사가 수동 배정 필요)`)
 
       return {
         wordlist: newWordlist,
-        assignment: newAssignment,
+        assignment: null,  // 자동 배정하지 않음
         wordCount: skippedWords.length
       }
     } catch (err) {

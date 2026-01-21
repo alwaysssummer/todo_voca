@@ -4,10 +4,14 @@ interface MobileStudyPageProps {
   params: Promise<{
     token: string
   }>
+  searchParams: Promise<{
+    assignment?: string
+  }>
 }
 
-export default async function MobileStudyPage({ params }: MobileStudyPageProps) {
+export default async function MobileStudyPage({ params, searchParams }: MobileStudyPageProps) {
   const { token } = await params
-  return <StudyScreen token={token} />
-}
+  const { assignment: assignmentId } = await searchParams
 
+  return <StudyScreen token={token} assignmentId={assignmentId} />
+}

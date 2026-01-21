@@ -84,6 +84,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     wrongWordIds: number[] | null
   } | null>(null)
 
+  // 선택된 단어장 index (여러 단어장 지원)
+  const [selectedAssignmentIndex, setSelectedAssignmentIndex] = useState(0)
+
   // 체크박스 토글 함수 (Shift+클릭으로 범위 선택 지원)
   const toggleSessionSelection = (sessionId: string, index: number, event: React.MouseEvent) => {
     const isShiftPressed = event.shiftKey
@@ -142,8 +145,8 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   // 전체 단어장 출력 핸들러
   const handleWholeVocabularyPrint = () => {
     console.log('전체 단어장 출력')
-    console.log('currentAssignment:', currentAssignment)
-    console.log('wordlist_id:', currentAssignment?.wordlist_id)
+    console.log('selectedAssignment:', selectedAssignment)
+    console.log('wordlist_id:', selectedAssignment?.wordlist_id)
     setWholeVocabModalOpen(true)
   }
 
@@ -161,15 +164,31 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     setTestResultModalOpen(true)
   }
 
-  const completedSessionsRaw = data?.completedSessions ?? []
-  const currentAssignmentId = data?.currentAssignment?.id ?? null
+  // 선택된 단어장 (data가 있을 때만 유효)
+  const assignments = data?.assignments ?? []
+  const currentAssignment = data?.currentAssignment ?? null
+  const selectedAssignment = assignments[selectedAssignmentIndex] || currentAssignment
 
+  // 완료된 세션 데이터 (data가 있을 때만 유효)
+  const completedSessionsRaw = data?.completedSessions ?? []
+
+  // 선택된 단어장 및 관련 단어장(같은 base_wordlist_id)의 세션 필터링
   const filteredCompletedSessions = useMemo(() => {
-    if (!currentAssignmentId) {
-      return completedSessionsRaw
-    }
-    return completedSessionsRaw.filter(session => session.assignment_id === currentAssignmentId)
-  }, [completedSessionsRaw, currentAssignmentId])
+    if (!selectedAssignment) return []
+
+    // 선택된 단어장의 base_wordlist_id (없으면 wordlist_id 사용)
+    const baseId = selectedAssignment.base_wordlist_id || selectedAssignment.wordlist_id
+
+    // 같은 base_wordlist_id를 가진 모든 assignment의 id 목록
+    const relatedAssignmentIds = assignments
+      .filter(a => (a.base_wordlist_id || a.wordlist_id) === baseId)
+      .map(a => a.id)
+
+    // 관련된 모든 assignment의 회차 표시
+    return completedSessionsRaw.filter(session =>
+      relatedAssignmentIds.includes(session.assignment_id)
+    )
+  }, [completedSessionsRaw, selectedAssignment, assignments])
 
   const sessions = useMemo(() => {
     const uniqueMap = new Map<string, (typeof filteredCompletedSessions)[number]>()
@@ -195,6 +214,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     })
   }, [filteredCompletedSessions])
 
+  // === 조기 반환 (모든 Hook 후에) ===
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -226,8 +246,29 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     )
   }
 
-  const { student, currentAssignment } = data
-  
+  // 선택된 단어장이 없으면 에러 표시
+  if (!selectedAssignment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-destructive">단어장 없음</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              배정된 단어장이 없습니다. 선생님에게 문의해주세요.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const { student } = data
+
   // 날짜별로 세션 그룹핑
   const getSessionsByDate = () => {
     type Session = typeof sessions[number]
@@ -315,22 +356,38 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   // ⭐ 통계 계산
   const completedSessionsCount = sessions.length
   const currentSession = completedSessionsCount + 1  // 다음 학습할 회차
-  const totalSessions = Math.ceil(currentAssignment.total_words / student.session_goal)
-  
-  const isGenerationCompleted = currentAssignment.completed_words >= currentAssignment.total_words
+  const totalSessions = Math.ceil(selectedAssignment.total_words / student.session_goal)
+
+  const isGenerationCompleted = selectedAssignment.completed_words >= selectedAssignment.total_words
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* 헤더 */}
       <header className="bg-white border-b shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-blue-600" />
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-5 h-5 text-blue-600" />
               <span className="font-semibold text-lg">{student.name}</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="text-sm text-muted-foreground">{currentAssignment.wordlist_name}</span>
             </div>
+            {/* 단어장 선택 드롭다운 (여러 개일 때만) */}
+            {assignments && assignments.length > 1 ? (
+              <select
+                className="text-sm border rounded-md px-3 py-1.5 bg-white"
+                value={selectedAssignmentIndex}
+                onChange={(e) => setSelectedAssignmentIndex(Number(e.target.value))}
+              >
+                {assignments.map((assignment, idx) => (
+                  <option key={assignment.id} value={idx}>
+                    {assignment.wordlist_name}
+                    {assignment.is_review ? ' (복습)' : ''}
+                    {' '}({Math.round((assignment.completed_words / assignment.total_words) * 100)}%)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm text-muted-foreground">{selectedAssignment.wordlist_name}</span>
+            )}
           </div>
         </div>
       </header>
@@ -356,13 +413,13 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               <span className="text-lg font-semibold">{currentSession}/{totalSessions}</span>
               <div className="flex-1 flex items-center gap-2">
                 <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-white rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%` }}
+                    style={{ width: `${Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%` }}
                   />
                 </div>
                 <span className="text-sm font-medium min-w-[3rem] text-right">
-                  {Math.round((currentAssignment.completed_words / currentAssignment.total_words) * 100)}%
+                  {Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%
                 </span>
               </div>
             </div>
@@ -816,12 +873,12 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
       />
 
       {/* 전체 단어장 출력 모달 */}
-      {currentAssignment && (
+      {selectedAssignment && (
         <WholeVocabularyPrintModal
           open={wholeVocabModalOpen}
           onClose={() => setWholeVocabModalOpen(false)}
-          wordlistId={currentAssignment.wordlist_id}
-          title={`전체 단어장 (${currentAssignment.total_words}개)`}
+          wordlistId={selectedAssignment.wordlist_id}
+          title={`전체 단어장 (${selectedAssignment.total_words}개)`}
         />
       )}
 

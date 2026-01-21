@@ -36,6 +36,10 @@ export interface Wordlist {
   created_at: string
   updated_at?: string
   display_order?: number
+  // 복습 단어장 구분 필드
+  is_review?: boolean
+  source_wordlist_id?: string | null
+  created_for_student_id?: string | null
 }
 
 export interface Word {
@@ -176,21 +180,29 @@ export interface PendingTest {
 // Dashboard Types (useStudentDashboard용)
 // ============================================================
 
+// 개별 단어장 배정 정보
+export interface AssignmentData {
+  id: string
+  generation: number
+  wordlist_id: string
+  wordlist_name: string
+  total_words: number
+  completed_words: number
+  filtered_word_ids: number[] | null
+  base_wordlist_id: string | null  // 원본 단어장 ID (복습용)
+  is_review: boolean  // 복습 단어장 여부
+}
+
 export interface DashboardData {
   student: {
     id: string
     name: string
     session_goal: number  // 회차당 목표
   }
-  currentAssignment: {
-    id: string
-    generation: number
-    wordlist_id: string
-    wordlist_name: string
-    total_words: number
-    completed_words: number
-    filtered_word_ids: number[] | null
-  }
+  // 여러 단어장 지원
+  assignments: AssignmentData[]
+  // 하위 호환성을 위해 currentAssignment 유지 (첫 번째 단어장)
+  currentAssignment: AssignmentData | null
   completedSessions: Array<{
     id: string
     session_number: number  // 회차 번호
