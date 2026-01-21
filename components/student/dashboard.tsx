@@ -61,6 +61,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   // 시험지 출력용 체크박스 state
   const [selectedSessionsForExam, setSelectedSessionsForExam] = useState<string[]>([])
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null)
   
   // 시험지 출력 모달 state
   const [examModalOpen, setExamModalOpen] = useState(false)
@@ -83,13 +84,31 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     wrongWordIds: number[] | null
   } | null>(null)
 
-  // 체크박스 토글 함수
-  const toggleSessionSelection = (sessionId: string) => {
-    setSelectedSessionsForExam(prev => 
-      prev.includes(sessionId)
-        ? prev.filter(id => id !== sessionId)
-        : [...prev, sessionId]
-    )
+  // 체크박스 토글 함수 (Shift+클릭으로 범위 선택 지원)
+  const toggleSessionSelection = (sessionId: string, index: number, event: React.MouseEvent) => {
+    const isShiftPressed = event.shiftKey
+
+    if (isShiftPressed && lastClickedIndex !== null) {
+      // Shift+클릭: 범위 선택 (마지막 클릭 위치부터 현재까지)
+      const start = Math.min(lastClickedIndex, index)
+      const end = Math.max(lastClickedIndex, index)
+      const rangeIds = sessions.slice(start, end + 1).map(s => s.id)
+
+      setSelectedSessionsForExam(prev => {
+        const newSet = new Set(prev)
+        rangeIds.forEach(id => newSet.add(id))
+        return Array.from(newSet)
+      })
+      setLastClickedIndex(index)
+    } else {
+      // 일반 클릭 또는 Ctrl+클릭: 토글 (현재 동작 유지)
+      setSelectedSessionsForExam(prev =>
+        prev.includes(sessionId)
+          ? prev.filter(id => id !== sessionId)
+          : [...prev, sessionId]
+      )
+      setLastClickedIndex(index)
+    }
   }
 
   // 시험지 출력 핸들러
@@ -460,20 +479,23 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                 </div>
 
                 {/* 전체 보기 - 회차 목록 */}
-                {viewMode === 'all' && sessions.map((session) => {
+                {viewMode === 'all' && sessions.map((session, index) => {
                   const knownCount = session.word_count || 0
                   const unknownCount = session.unknown_count || 0
-                  
+
                   return (
                     <Card key={session.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-3">
                         <div className="flex items-center justify-between">
                           {/* 왼쪽: 체크박스 + 회차 정보 */}
                           <div className="flex items-center gap-3">
-                            {/* 시험지 출력용 체크박스 */}
+                            {/* 시험지 출력용 체크박스 (Shift+클릭으로 범위 선택 가능) */}
                             <Checkbox
                               checked={selectedSessionsForExam.includes(session.id)}
-                              onCheckedChange={() => toggleSessionSelection(session.id)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSessionSelection(session.id, index, e)
+                              }}
                             />
                             
                             <div className="font-semibold text-base flex items-center gap-2">
