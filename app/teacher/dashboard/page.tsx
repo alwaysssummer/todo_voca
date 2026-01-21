@@ -30,6 +30,7 @@ import { AssignWordlistDialog } from '@/components/teacher/assign-wordlist-dialo
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
+import { StudentManagementDialog } from '@/components/teacher/student-management-dialog'
 import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
 import { Input } from '@/components/ui/input'
 import {
@@ -182,6 +183,10 @@ export default function TeacherDashboard() {
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [printWordlistId, setPrintWordlistId] = useState('')
   const [printWordlistTitle, setPrintWordlistTitle] = useState('')
+
+  // 학생 관리 모달 state
+  const [studentManagementOpen, setStudentManagementOpen] = useState(false)
+  const [selectedStudentForManagement, setSelectedStudentForManagement] = useState<Student | null>(null)
 
   useEffect(() => {
     // 개인용: 로그인 없이 바로 접속
@@ -1055,7 +1060,16 @@ export default function TeacherDashboard() {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 group">
-                                <h3 className="font-semibold">{student.name}</h3>
+                                <h3
+                                  className="font-semibold cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                                  onClick={() => {
+                                    setSelectedStudentForManagement(student)
+                                    setStudentManagementOpen(true)
+                                  }}
+                                  title="학생 관리"
+                                >
+                                  {student.name}
+                                </h3>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -1399,6 +1413,24 @@ export default function TeacherDashboard() {
         wordlistId={printWordlistId}
         title={printWordlistTitle}
       />
+
+      {/* 학생 관리 모달 */}
+      {selectedStudentForManagement && (
+        <StudentManagementDialog
+          open={studentManagementOpen}
+          onClose={() => {
+            setStudentManagementOpen(false)
+            setSelectedStudentForManagement(null)
+          }}
+          studentId={selectedStudentForManagement.id}
+          studentName={selectedStudentForManagement.name}
+          accessToken={selectedStudentForManagement.accessToken || ''}
+          onAssignWordlist={() => {
+            openAssignDialog(selectedStudentForManagement.id, selectedStudentForManagement.name)
+          }}
+          onDataChanged={loadDashboardData}
+        />
+      )}
     </div>
   )
 }
