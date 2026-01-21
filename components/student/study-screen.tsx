@@ -360,20 +360,44 @@ export function StudyScreen({ token }: { token: string }) {
 
     // ⭐⭐⭐ 단어장 학습 완료 모달이 표시 중이면 빈 화면 + 모달 표시
     if (showGenerationCompleteModal) {
+      // generationModalData가 없어도 완료 화면 표시 (fallback)
+      if (!generationModalData || !currentWordlist) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <Card className="p-8 max-w-md text-center space-y-4">
+              <div className="text-6xl mb-4">🎉</div>
+              <h2 className="text-2xl font-bold">단어장 학습 완료!</h2>
+              <p className="text-muted-foreground">모든 단어를 학습했습니다.</p>
+              <Button
+                onClick={() => {
+                  const isMobile = sessionStorage.getItem('dashboardMode') === 'mobile' ||
+                                   window.location.pathname.includes('/mobile/')
+                  const dashboardPath = isMobile
+                    ? `/s/${token}/mobile/dashboard`
+                    : `/s/${token}/dashboard`
+                  window.location.href = dashboardPath
+                }}
+                className="w-full"
+                size="lg"
+              >
+                대시보드로 이동
+              </Button>
+            </Card>
+          </div>
+        )
+      }
+
       return (
         <div className="h-screen">
-          {/* 단어장 학습 완료 모달 */}
-          {generationModalData && currentWordlist && (
-            <GenerationCompleteModal
-              open={showGenerationCompleteModal}
-              onClose={() => setShowGenerationCompleteModal(false)}
-              totalWords={currentWordlist.total_words}
-              skippedCount={generationModalData.skippedCount}
-              nextGenerationCreated={generationModalData.nextGenerationCreated}
-              perfectCompletion={generationModalData.perfectCompletion}
-              studentToken={token}
-            />
-          )}
+          <GenerationCompleteModal
+            open={showGenerationCompleteModal}
+            onClose={() => setShowGenerationCompleteModal(false)}
+            totalWords={currentWordlist.total_words}
+            skippedCount={generationModalData.skippedCount}
+            nextGenerationCreated={generationModalData.nextGenerationCreated}
+            perfectCompletion={generationModalData.perfectCompletion}
+            studentToken={token}
+          />
         </div>
       )
     }
