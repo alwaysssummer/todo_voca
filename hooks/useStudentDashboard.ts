@@ -127,7 +127,7 @@ export function useStudentDashboard(token: string) {
         // Supabase 관계형 데이터 안전하게 접근
         const assignmentWithWordlist = assignment as unknown as StudentWordlistWithWordlist
         const wordlistData = assignmentWithWordlist.wordlists
-        
+
         setData({
           student: {
             id: student.id,

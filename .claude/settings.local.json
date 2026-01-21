@@ -25,7 +25,11 @@
       "Bash(ping:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: 회차 완료 조건 개선 - 마지막 회차 처리 로직\n\n- isSessionComplete\\(\\) 함수에 hasMoreWords 파라미터 추가\n  - 새 단어 있으면: 안다 >= 목표로 회차 완료 판정\n  - 새 단어 없으면: 학습한 총 개수\\(안다+모른다\\)로 완료 판정\n- handleKnow\\(\\) 수정: 다음 단어 미리 체크하여 hasMoreWords 전달\n- fetchNextWord\\(\\) 수정: 회차 전환 시 완성 단어장 생성 추가\n- 타입 수정: wrongWordIds, filtered_word_ids를 number[]로 변경\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__execute_sql",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ]
   }
 }
