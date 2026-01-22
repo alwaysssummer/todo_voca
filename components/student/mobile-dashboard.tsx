@@ -30,8 +30,15 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
   const router = useRouter()
   const { data, loading, error } = useStudentDashboard(token)
 
-  const completedSessionsRaw = data?.completedSessions ?? []
-  const assignments = data?.assignments ?? []
+  // ⭐ useMemo로 감싸서 매 렌더마다 새 배열 생성 방지
+  const completedSessionsRaw = useMemo(
+    () => data?.completedSessions ?? [],
+    [data?.completedSessions]
+  )
+  const assignments = useMemo(
+    () => data?.assignments ?? [],
+    [data?.assignments]
+  )
 
   // ⭐ 메인 탭 상태 (학습 | 기록)
   const [mainTab, setMainTab] = useState<'study' | 'record'>('study')
