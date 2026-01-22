@@ -441,6 +441,11 @@ export function StudentManagementDialog({
       } else {
         // 배정 해제 - 모든 관련 학습 기록도 함께 삭제 (초기화)
         // 1. 해당 배정의 assignment 정보 조회
+        interface AssignmentInfo {
+          id: string
+          wordlist_id: string
+          filtered_word_ids: number[] | null
+        }
         const { data: assignmentData } = await supabase
           .from('student_wordlists')
           .select('id, wordlist_id, filtered_word_ids')
@@ -448,7 +453,7 @@ export function StudentManagementDialog({
           .eq('wordlist_id', wordlistId)
           .eq('generation', 1)
           .eq('is_auto_generated', false)
-          .single()
+          .single<AssignmentInfo>()
 
         if (assignmentData) {
           // 2. 재귀적으로 배정과 관련 데이터 삭제
