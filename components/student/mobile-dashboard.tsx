@@ -13,7 +13,10 @@ import {
   XCircle,
   Calendar,
   Play,
-  Award
+  Award,
+  ChevronLeft,
+  ChevronRight,
+  BarChart3
 } from 'lucide-react'
 import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
 import { KnownWordsModal } from '@/components/student/known-words-modal'
@@ -30,7 +33,16 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
   const completedSessionsRaw = data?.completedSessions ?? []
   const assignments = data?.assignments ?? []
 
-  // 탭 선택 상태
+  // ⭐ 메인 탭 상태 (학습 | 기록)
+  const [mainTab, setMainTab] = useState<'study' | 'record'>('study')
+
+  // ⭐ 기록 탭 - 월 선택 상태
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
+
+  // 단어장 탭 선택 상태
   const [selectedTabIndex, setSelectedTabIndex] = useState<number>(0)
 
   // 선택된 단어장
@@ -78,6 +90,58 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
     })
   }, [filteredCompletedSessions])
 
+  // ⭐ 기록 탭용 - 선택한 월의 날짜별 학습 기록
+  const recordData = useMemo(() => {
+    const { year, month } = selectedMonth
+
+    // 해당 월의 모든 날짜 생성 (역순 - 최신 날짜가 위로)
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const dates: { date: Date; dateStr: string; dayOfWeek: string }[] = []
+
+    for (let d = daysInMonth; d >= 1; d--) {
+      const date = new Date(year, month, d)
+      const dateStr = date.toISOString().split('T')[0]
+      const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
+      dates.push({ date, dateStr, dayOfWeek })
+    }
+
+    // assignment_id로 wordlist_name 매핑
+    const assignmentMap = new Map<string, string>()
+    assignments.forEach(a => {
+      assignmentMap.set(a.id, a.wordlist_name)
+    })
+
+    // 날짜별 + 단어장별 회차 기록 집계
+    const recordMap = new Map<string, Map<string, number[]>>()  // dateStr -> wordlistName -> sessions[]
+
+    completedSessionsRaw.forEach(session => {
+      const dateStr = session.completed_date
+      const wordlistName = assignmentMap.get(session.assignment_id) || 'Unknown'
+
+      if (!recordMap.has(dateStr)) {
+        recordMap.set(dateStr, new Map())
+      }
+      const dayRecord = recordMap.get(dateStr)!
+      if (!dayRecord.has(wordlistName)) {
+        dayRecord.set(wordlistName, [])
+      }
+      dayRecord.get(wordlistName)!.push(session.session_number)
+    })
+
+    // 사용된 단어장 목록 (순서 유지)
+    const wordlistNames = assignments.map(a => a.wordlist_name)
+
+    // 학습 기록이 있는 날짜만 필터링
+    const datesWithRecords = dates.filter(d => recordMap.has(d.dateStr))
+
+    return {
+      dates: datesWithRecords,
+      recordMap,
+      wordlistNames,
+      allDates: dates
+    }
+  }, [selectedMonth, completedSessionsRaw, assignments])
+
   // 모르는 단어 모달 state
   const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
   const [selectedSession, setSelectedSession] = useState<{
@@ -114,6 +178,22 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
       wrongWordIds
     })
     setTestResultModalOpen(true)
+  }
+
+  // 월 이동
+  const changeMonth = (delta: number) => {
+    setSelectedMonth(prev => {
+      let newMonth = prev.month + delta
+      let newYear = prev.year
+      if (newMonth < 0) {
+        newMonth = 11
+        newYear--
+      } else if (newMonth > 11) {
+        newMonth = 0
+        newYear++
+      }
+      return { year: newYear, month: newMonth }
+    })
   }
 
   if (loading) {
@@ -177,14 +257,42 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
       {/* 헤더 - 모바일 최적화 */}
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="font-semibold text-base">{student.name}</span>
+          {/* 학생 이름 + 탭 스위치 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-600 flex-shrink-0" />
+              <span className="font-semibold text-base">{student.name}</span>
+            </div>
+
+            {/* ⭐ 학습/기록 탭 스위치 */}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setMainTab('study')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  mainTab === 'study'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                학습
+              </button>
+              <button
+                onClick={() => setMainTab('record')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1 ${
+                  mainTab === 'record'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                기록
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* 단어장 탭 - 2개 이상일 때만 표시 */}
-        {assignments.length > 1 && (
+        {/* 단어장 탭 - 학습 탭에서만, 2개 이상일 때만 표시 */}
+        {mainTab === 'study' && assignments.length > 1 && (
           <div className="flex border-t">
             {assignments.map((assignment, index) => (
               <button
@@ -208,196 +316,303 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
 
       {/* 메인 콘텐츠 */}
       <main className="px-4 py-4">
-
-        {/* 학습 버튼 - 모바일 최적화 */}
-        <Button
-          size="lg"
-          className="w-full h-16 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-base"
-          onClick={() => {
-            sessionStorage.setItem('dashboardMode', 'mobile')
-            router.push(`/s/${token}/mobile/study?assignment=${selectedAssignment.id}`)
-          }}
-          disabled={isGenerationCompleted}
-        >
-          {isGenerationCompleted ? (
-            <>
-              <Award className="mr-2 h-5 w-5" />
-              학습 완료
-            </>
-          ) : (
-            <div className="flex items-center gap-3 w-full">
-              <Play className="h-5 w-5 flex-shrink-0" />
-              <span className="text-lg font-semibold">{currentSession}/{totalSessions}</span>
-              <div className="flex-1 flex items-center gap-2">
-                <div className="flex-1 h-2.5 bg-white/20 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full transition-all duration-300"
-                    style={{ width: `${Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%` }}
-                  />
+        {mainTab === 'study' ? (
+          // ⭐ 학습 탭 (기존 내용)
+          <>
+            {/* 학습 버튼 - 모바일 최적화 */}
+            <Button
+              size="lg"
+              className="w-full h-16 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-base"
+              onClick={() => {
+                sessionStorage.setItem('dashboardMode', 'mobile')
+                router.push(`/s/${token}/mobile/study?assignment=${selectedAssignment.id}`)
+              }}
+              disabled={isGenerationCompleted}
+            >
+              {isGenerationCompleted ? (
+                <>
+                  <Award className="mr-2 h-5 w-5" />
+                  학습 완료
+                </>
+              ) : (
+                <div className="flex items-center gap-3 w-full">
+                  <Play className="h-5 w-5 flex-shrink-0" />
+                  <span className="text-lg font-semibold">{currentSession}/{totalSessions}</span>
+                  <div className="flex-1 flex items-center gap-2">
+                    <div className="flex-1 h-2.5 bg-white/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-white rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-base font-medium min-w-[3rem] text-right">
+                      {Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%
+                    </span>
+                  </div>
                 </div>
-                <span className="text-base font-medium min-w-[3rem] text-right">
-                  {Math.round((selectedAssignment.completed_words / selectedAssignment.total_words) * 100)}%
+              )}
+            </Button>
+
+            {/* 학습 기록 - 모바일 최적화 */}
+            <Card>
+              <CardContent className="p-4">
+                {sessions.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">아직 완성된 회차가 없습니다</p>
+                    <p className="text-sm mt-1">학습을 시작해보세요!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* 회차 목록 */}
+                    {sessions.map((session) => {
+                      const knownCount = session.word_count || 0
+                      const unknownCount = session.unknown_count || 0
+
+                      return (
+                        <Card key={session.id} className="hover:shadow-md transition-shadow border-2">
+                          <CardContent className="p-4">
+                            {/* 회차 번호 + 날짜 */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="font-bold text-lg">
+                                {String(session.session_number).padStart(2, '0')}회차
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {(new Date(session.completed_date).getMonth() + 1)}/{new Date(session.completed_date).getDate()}
+                              </div>
+                            </div>
+
+                            {/* O-TEST 영역 */}
+                            <div className="mb-3 pb-3 border-b">
+                              <div className="flex items-center justify-between">
+                                <Button
+                                  variant="ghost"
+                                  size="lg"
+                                  className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 h-12"
+                                  onClick={() => {
+                                    setSelectedKnownSession({
+                                      id: session.id,
+                                      sessionNumber: session.session_number,
+                                      knownCount: knownCount
+                                    })
+                                    setKnownWordsOpen(true)
+                                  }}
+                                >
+                                  <CheckCircle2 className="w-5 h-5" />
+                                  <span className="text-base font-semibold">{knownCount}</span>
+                                </Button>
+
+                                {/* O-TEST 평가 상태 */}
+                                <div className="flex items-center justify-center min-w-[5rem]">
+                                  {session.o_test_completed ? (
+                                    <div
+                                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => handleViewTestResult(
+                                        session.session_number,
+                                        'known',
+                                        session.o_test_wrong_word_ids
+                                      )}
+                                      title="테스트 결과 보기"
+                                    >
+                                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+                                      <span className="text-base font-semibold text-green-700">
+                                        {session.o_test_correct}/{session.o_test_total}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
+                                      onClick={() => {
+                                        sessionStorage.setItem('dashboardMode', 'mobile')
+                                        router.push(`/s/${token}/test/${session.id}?type=known`)
+                                      }}
+                                      title="O-TEST 평가 시작"
+                                      aria-label="O-TEST 평가 시작하기"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* X-TEST 영역 */}
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <Button
+                                  variant="ghost"
+                                  size="lg"
+                                  className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 h-12"
+                                  onClick={() => {
+                                    if (unknownCount > 0) {
+                                      setSelectedSession({
+                                        id: session.id,
+                                        sessionNumber: session.session_number,
+                                        unknownCount: unknownCount
+                                      })
+                                      setUnknownWordsOpen(true)
+                                    }
+                                  }}
+                                  disabled={unknownCount === 0}
+                                >
+                                  <XCircle className="w-5 h-5" />
+                                  <span className="text-base font-semibold">{unknownCount}</span>
+                                </Button>
+
+                                {/* X-TEST 평가 상태 */}
+                                <div className="flex items-center justify-center min-w-[5rem]">
+                                  {unknownCount === 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
+                                      <span className="text-base font-semibold text-orange-700">
+                                        0/0
+                                      </span>
+                                    </div>
+                                  ) : session.x_test_completed ? (
+                                    <div
+                                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => handleViewTestResult(
+                                        session.session_number,
+                                        'unknown',
+                                        session.x_test_wrong_word_ids
+                                      )}
+                                      title="테스트 결과 보기"
+                                    >
+                                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
+                                      <span className="text-base font-semibold text-orange-700">
+                                        {session.x_test_correct}/{session.x_test_total}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
+                                      onClick={() => {
+                                        sessionStorage.setItem('dashboardMode', 'mobile')
+                                        router.push(`/s/${token}/test/${session.id}?type=unknown`)
+                                      }}
+                                      title="X-TEST 평가 시작"
+                                      aria-label="X-TEST 평가 시작하기"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          // ⭐ 기록 탭 (새로 추가)
+          <>
+            {/* 월 선택 헤더 */}
+            <div className="flex items-center justify-between mb-4 bg-white rounded-lg px-4 py-3 shadow-sm">
+              <button
+                onClick={() => changeMonth(-1)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <span className="font-semibold text-lg">
+                {selectedMonth.year}년 {selectedMonth.month + 1}월
+              </span>
+              <button
+                onClick={() => changeMonth(1)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            {/* 학습 기록 테이블 */}
+            <Card>
+              <CardContent className="p-0">
+                {recordData.dates.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">이 달에 학습 기록이 없습니다</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap border-b">
+                            날짜
+                          </th>
+                          {recordData.wordlistNames.map((name, idx) => (
+                            <th
+                              key={idx}
+                              className="px-2 py-2.5 text-center font-medium text-gray-600 border-b min-w-[60px]"
+                            >
+                              <span className="block truncate max-w-[60px]" title={name}>
+                                {name.length > 5 ? name.slice(0, 5) + '..' : name}
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recordData.dates.map((dateInfo, rowIdx) => {
+                          const dayRecord = recordData.recordMap.get(dateInfo.dateStr)
+                          const day = dateInfo.date.getDate()
+
+                          return (
+                            <tr
+                              key={dateInfo.dateStr}
+                              className={rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}
+                            >
+                              <td className="px-3 py-2.5 whitespace-nowrap border-b">
+                                <span className="font-medium">{day}</span>
+                                <span className="text-gray-400 ml-1">({dateInfo.dayOfWeek})</span>
+                              </td>
+                              {recordData.wordlistNames.map((name, colIdx) => {
+                                const sessions = dayRecord?.get(name) || []
+                                return (
+                                  <td
+                                    key={colIdx}
+                                    className="px-2 py-2.5 text-center border-b"
+                                  >
+                                    {sessions.length > 0 ? (
+                                      <span className="text-blue-600 font-semibold">
+                                        {sessions.sort((a, b) => a - b).join(',')}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-300">-</span>
+                                    )}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 월 통계 */}
+            <div className="mt-4 bg-white rounded-lg px-4 py-3 shadow-sm">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">이번 달 학습 일수</span>
+                <span className="font-semibold text-blue-600">{recordData.dates.length}일</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-2">
+                <span className="text-gray-600">이번 달 총 회차</span>
+                <span className="font-semibold text-blue-600">
+                  {completedSessionsRaw.filter(s => {
+                    const d = new Date(s.completed_date)
+                    return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month
+                  }).length}회
                 </span>
               </div>
             </div>
-          )}
-        </Button>
-
-        {/* 학습 기록 - 모바일 최적화 */}
-        <Card>
-          <CardContent className="p-4">
-            {sessions.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">아직 완성된 회차가 없습니다</p>
-                <p className="text-sm mt-1">학습을 시작해보세요!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {/* 회차 목록 - 체크박스와 날짜 제거, 출력 버튼 제거 */}
-                {sessions.map((session) => {
-                  const knownCount = session.word_count || 0
-                  const unknownCount = session.unknown_count || 0
-
-                  return (
-                    <Card key={session.id} className="hover:shadow-md transition-shadow border-2">
-                      <CardContent className="p-4">
-                        {/* 회차 번호 + 날짜 */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="font-bold text-lg">
-                            {String(session.session_number).padStart(2, '0')}회차
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {(new Date(session.completed_date).getMonth() + 1)}/{new Date(session.completed_date).getDate()}
-                          </div>
-                        </div>
-
-                        {/* O-TEST 영역 */}
-                        <div className="mb-3 pb-3 border-b">
-                          <div className="flex items-center justify-between">
-                            <Button
-                              variant="ghost"
-                              size="lg"
-                              className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 h-12"
-                              onClick={() => {
-                                setSelectedKnownSession({
-                                  id: session.id,
-                                  sessionNumber: session.session_number,
-                                  knownCount: knownCount
-                                })
-                                setKnownWordsOpen(true)
-                              }}
-                            >
-                              <CheckCircle2 className="w-5 h-5" />
-                              <span className="text-base font-semibold">{knownCount}</span>
-                            </Button>
-
-                            {/* O-TEST 평가 상태 */}
-                            <div className="flex items-center justify-center min-w-[5rem]">
-                              {session.o_test_completed ? (
-                                // 평가 완료: 점수 표시 (클릭 가능)
-                                <div
-                                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => handleViewTestResult(
-                                    session.session_number,
-                                    'known',
-                                    session.o_test_wrong_word_ids
-                                  )}
-                                  title="테스트 결과 보기"
-                                >
-                                  <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                                  <span className="text-base font-semibold text-green-700">
-                                    {session.o_test_correct}/{session.o_test_total}
-                                  </span>
-                                </div>
-                              ) : (
-                                // 평가 전: 회색 원 버튼
-                                <button
-                                  className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
-                                  onClick={() => {
-                                    sessionStorage.setItem('dashboardMode', 'mobile')
-                                    router.push(`/s/${token}/test/${session.id}?type=known`)
-                                  }}
-                                  title="O-TEST 평가 시작"
-                                  aria-label="O-TEST 평가 시작하기"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* X-TEST 영역 */}
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <Button
-                              variant="ghost"
-                              size="lg"
-                              className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 h-12"
-                              onClick={() => {
-                                if (unknownCount > 0) {
-                                  setSelectedSession({
-                                    id: session.id,
-                                    sessionNumber: session.session_number,
-                                    unknownCount: unknownCount
-                                  })
-                                  setUnknownWordsOpen(true)
-                                }
-                              }}
-                              disabled={unknownCount === 0}
-                            >
-                              <XCircle className="w-5 h-5" />
-                              <span className="text-base font-semibold">{unknownCount}</span>
-                            </Button>
-
-                            {/* X-TEST 평가 상태 */}
-                            <div className="flex items-center justify-center min-w-[5rem]">
-                              {unknownCount === 0 ? (
-                                // 모르는 단어 없음: 자동 완료 표시 (0/0)
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
-                                  <span className="text-base font-semibold text-orange-700">
-                                    0/0
-                                  </span>
-                                </div>
-                              ) : session.x_test_completed ? (
-                                // 평가 완료: 점수 표시 (클릭 가능)
-                                <div
-                                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => handleViewTestResult(
-                                    session.session_number,
-                                    'unknown',
-                                    session.x_test_wrong_word_ids
-                                  )}
-                                  title="테스트 결과 보기"
-                                >
-                                  <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
-                                  <span className="text-base font-semibold text-orange-700">
-                                    {session.x_test_correct}/{session.x_test_total}
-                                  </span>
-                                </div>
-                              ) : (
-                                // 평가 전: 회색 원 버튼
-                                <button
-                                  className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
-                                  onClick={() => {
-                                    sessionStorage.setItem('dashboardMode', 'mobile')
-                                    router.push(`/s/${token}/test/${session.id}?type=unknown`)
-                                  }}
-                                  title="X-TEST 평가 시작"
-                                  aria-label="X-TEST 평가 시작하기"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </>
+        )}
       </main>
 
       {/* 모르는 단어 모달 */}

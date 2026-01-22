@@ -50,18 +50,34 @@ export function useStudentDashboard(token: string) {
         // 3. 각 단어장별 완료 단어 수 계산
         const assignments: AssignmentData[] = await Promise.all(
           assignmentsRaw.map(async (assignment) => {
-            let completedQuery = supabase
-              .from('student_word_progress')
-              .select('*', { count: 'exact', head: true })
-              .eq('student_id', student.id)
-              .eq('status', 'completed')
+            // ⭐ 대상 단어 ID 결정 (해당 단어장의 단어만 카운트하도록!)
+            let targetWordIds: number[] = []
 
-            // filtered_word_ids가 있으면 해당 단어만 카운트
             if (assignment.filtered_word_ids && assignment.filtered_word_ids.length > 0) {
-              completedQuery = completedQuery.in('word_id', assignment.filtered_word_ids)
+              // 복습 단어장: filtered_word_ids 사용
+              targetWordIds = assignment.filtered_word_ids
+            } else {
+              // 일반 단어장: words 테이블에서 해당 단어장의 단어 ID 조회
+              const { data: wordsData } = await supabase
+                .from('words')
+                .select('id')
+                .eq('wordlist_id', assignment.wordlist_id)
+
+              targetWordIds = wordsData?.map((w: { id: number }) => w.id) || []
             }
 
-            const { count: completedCount } = await completedQuery
+            // 완료된 단어 수 계산 (해당 단어장 단어만)
+            let completedCount = 0
+            if (targetWordIds.length > 0) {
+              const { count } = await supabase
+                .from('student_word_progress')
+                .select('*', { count: 'exact', head: true })
+                .eq('student_id', student.id)
+                .eq('status', 'completed')
+                .in('word_id', targetWordIds)
+
+              completedCount = count || 0
+            }
 
             const wordlistData = assignment.wordlists
             const isReview = assignment.is_auto_generated || assignment.generation > 1
