@@ -15,7 +15,6 @@ import {
   Eye,
   Trash2,
   CheckCircle2,
-  XCircle,
   Edit2,
   Check,
   X,
@@ -33,10 +32,9 @@ import { AddStudentDialog } from '@/components/teacher/add-student-dialog'
 import { AddWordlistDialog } from '@/components/teacher/add-wordlist-dialog'
 import { ViewWordlistDialog } from '@/components/teacher/view-wordlist-dialog'
 import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
-import { StudentManagementDialog } from '@/components/teacher/student-management-dialog'
+// StudentManagementDialog를 학생 상세 페이지로 대체함
 import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import {
   Table,
   TableBody,
@@ -45,13 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   DndContext,
   closestCenter,
@@ -77,18 +68,22 @@ interface DashboardStats {
   avgProgress: number
 }
 
+// 단어장별 회차 진행 정보
+interface WordlistProgress {
+  id: string              // student_wordlists.id (assignment)
+  name: string            // wordlist name
+  currentSession: number  // current_session
+  totalSessions: number   // session_goal 기반 계산
+}
+
 interface Student {
   id: string
   name: string
   email: string | null
-  progress: number
-  completedSessions: number    // 학습 완료 회차
-  totalSessions: number        // 학습 전체 회차
-  oTestCompleted: number       // O-TEST 완료 회차
-  xTestCompleted: number       // X-TEST 완료 회차
   accessToken: string | null
   displayOrder: number         // 표시 순서
   lastActivityAt: string | null // 최근 활동 시간
+  wordlists: WordlistProgress[]  // 단어장별 회차 진행 정보
 }
 
 interface Wordlist {
@@ -97,42 +92,6 @@ interface Wordlist {
   totalWords: number
   assignedStudents: number
   displayOrder: number         // 표시 순서
-}
-
-// Sortable Student Item 컴포넌트
-function SortableStudentItem({ student, children }: { student: Student; children: React.ReactNode }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: student.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-2"
-    >
-      {/* 드래그 핸들 */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-accent rounded"
-      >
-        <GripVertical className="w-5 h-5 text-muted-foreground" />
-      </div>
-      {children}
-    </div>
-  )
 }
 
 // Sortable Wordlist Item 컴포넌트
@@ -189,10 +148,9 @@ export default function TeacherDashboard() {
   const [selectedWordlist, setSelectedWordlist] = useState<Wordlist | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
-  // 정렬/필터 상태
-  const [sortField, setSortField] = useState<'name' | 'progress' | 'lastActivity'>('name')
+  // 정렬 상태 (단어장별 회차 표시로 변경하며 진행률 필터는 제거)
+  const [sortField, setSortField] = useState<'name' | 'lastActivity'>('name')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
-  const [progressFilter, setProgressFilter] = useState<'all' | 'warning' | 'inProgress' | 'good'>('all')
 
   const [editingWordlistId, setEditingWordlistId] = useState<string | null>(null)
   const [editingWordlistName, setEditingWordlistName] = useState('')
@@ -207,9 +165,6 @@ export default function TeacherDashboard() {
   const [printWordlistId, setPrintWordlistId] = useState('')
   const [printWordlistTitle, setPrintWordlistTitle] = useState('')
 
-  // 학생 관리 모달 state
-  const [studentManagementOpen, setStudentManagementOpen] = useState(false)
-  const [selectedStudentForManagement, setSelectedStudentForManagement] = useState<Student | null>(null)
 
   useEffect(() => {
     // 개인용: 로그인 없이 바로 접속
@@ -230,79 +185,47 @@ export default function TeacherDashboard() {
 
       if (studentsError) throw studentsError
 
-      // 각 학생의 진도 정보 계산
-      const studentsWithProgress: Student[] = await Promise.all(
+      // 각 학생의 단어장별 회차 정보 로딩
+      const studentsWithWordlists: Student[] = await Promise.all(
         (studentsData || []).map(async (student) => {
-          // 1. 학습 완료 회차 (completed_wordlists)
-          const { count: completedSessions } = await supabase
-            .from('completed_wordlists')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_id', student.id)
-
-          // 2. 학습 전체 회차 계산 (배정된 단어장의 총 회차)
-          type AssignmentData = Pick<StudentWordlist, 'wordlist_id' | 'daily_goal'>
-          const { data: assignments } = await supabase
-            .from('student_wordlists')
-            .select('wordlist_id, daily_goal')
-            .eq('student_id', student.id)
-            .returns<AssignmentData[]>()
-
-          let totalSessions = 0
-          if (assignments && assignments.length > 0) {
-            for (const assignment of assignments) {
-              const { data: wordlist } = await supabase
-                .from('wordlists')
-                .select('total_words')
-                .eq('id', assignment.wordlist_id)
-                .single<Pick<WordlistDB, 'total_words'>>()
-
-              if (wordlist && assignment.daily_goal > 0) {
-                totalSessions += Math.ceil(wordlist.total_words / assignment.daily_goal)
-              }
+          // 1. 배정된 단어장 정보 조회 (is_active인 것만)
+          interface AssignmentWithWordlist {
+            id: string
+            current_session: number
+            session_goal: number
+            wordlist: {
+              id: string
+              name: string
+              total_words: number
             }
           }
 
-          // 3. O-TEST 완료 회차
-          const { count: oTestCompleted } = await supabase
-            .from('online_tests')
-            .select('*', { count: 'exact', head: true })
+          const { data: assignments } = await supabase
+            .from('student_wordlists')
+            .select(`
+              id,
+              current_session,
+              session_goal,
+              wordlist:wordlists!inner(id, name, total_words)
+            `)
             .eq('student_id', student.id)
-            .eq('test_type', 'known')
+            .eq('is_active', true)
+            .returns<AssignmentWithWordlist[]>()
 
-          // 4. X-TEST 완료 회차 (실제 완료 + 자동 완료)
-          const { count: xTestCompletedReal } = await supabase
-            .from('online_tests')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_id', student.id)
-            .eq('test_type', 'unknown')
+          // 단어장별 회차 정보 계산
+          const wordlistsProgress: WordlistProgress[] = (assignments || []).map((a) => {
+            const totalSessions = a.session_goal > 0
+              ? Math.ceil(a.wordlist.total_words / a.session_goal)
+              : 0
+            return {
+              id: a.id,
+              name: a.wordlist.name,
+              currentSession: a.current_session || 0,
+              totalSessions: totalSessions
+            }
+          })
 
-          // X-TEST 자동 완료 (unknown_word_ids가 0개인 회차)
-          const { data: allCompleted } = await supabase
-            .from('completed_wordlists')
-            .select('unknown_word_ids')
-            .eq('student_id', student.id)
-            .returns<{ unknown_word_ids: number[] | null }[]>()
-
-          const autoCompleted = allCompleted?.filter(
-            item => !item.unknown_word_ids || item.unknown_word_ids.length === 0
-          ).length || 0
-
-          const xTestCompleted = (xTestCompletedReal || 0) + autoCompleted
-
-          // 5. 전체 진도 계산
-          const { count: completedCount } = await supabase
-            .from('student_word_progress')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_id', student.id)
-            .eq('status', 'completed')
-
-          const { count: totalWords } = await supabase
-            .from('words')
-            .select('*', { count: 'exact', head: true })
-
-          const progress = totalWords ? Math.round((completedCount || 0) / totalWords * 100) : 0
-
-          // 6. 최근 활동 시간 조회
+          // 2. 최근 활동 시간 조회
           const { data: lastProgress } = await supabase
             .from('student_word_progress')
             .select('updated_at')
@@ -335,19 +258,15 @@ export default function TeacherDashboard() {
             id: student.id,
             name: student.name,
             email: student.email || '',
-            progress: progress,
-            completedSessions: completedSessions || 0,
-            totalSessions: totalSessions,
-            oTestCompleted: oTestCompleted || 0,
-            xTestCompleted: xTestCompleted,
             accessToken: student.access_token,
             displayOrder: student.display_order || 0,
-            lastActivityAt: lastActivityAt
+            lastActivityAt: lastActivityAt,
+            wordlists: wordlistsProgress
           }
         })
       )
 
-      setStudents(studentsWithProgress)
+      setStudents(studentsWithWordlists)
 
       // 단어장 데이터 가져오기 (원본 단어장만, 복습 단어장 제외)
       type WordlistData = Pick<WordlistDB, 'id' | 'name' | 'total_words'> & { display_order?: number }
@@ -379,14 +298,27 @@ export default function TeacherDashboard() {
 
       setWordlists(wordlistsWithCount)
 
-      // 통계 계산
-      const activeCount = studentsWithProgress.filter(s => s.completedSessions > 0).length
-      const avgProg = studentsWithProgress.length > 0
-        ? studentsWithProgress.reduce((sum, s) => sum + s.progress, 0) / studentsWithProgress.length
-        : 0
+      // 통계 계산 (단어장 기반)
+      // 활동 학생 = 1개 이상의 단어장에서 회차가 진행된 학생
+      const activeCount = studentsWithWordlists.filter(s =>
+        s.wordlists.some(wl => wl.currentSession > 0)
+      ).length
+
+      // 평균 진행률 = 각 단어장의 (현재회차/총회차) 평균
+      let totalProgress = 0
+      let totalWordlistCount = 0
+      for (const student of studentsWithWordlists) {
+        for (const wl of student.wordlists) {
+          if (wl.totalSessions > 0) {
+            totalProgress += (wl.currentSession / wl.totalSessions) * 100
+            totalWordlistCount++
+          }
+        }
+      }
+      const avgProg = totalWordlistCount > 0 ? totalProgress / totalWordlistCount : 0
 
       setStats({
-        totalStudents: studentsWithProgress.length,
+        totalStudents: studentsWithWordlists.length,
         totalWordlists: wordlistsWithCount.length,
         activeStudents: activeCount,
         avgProgress: Math.round(avgProg)
@@ -806,18 +738,12 @@ export default function TeacherDashboard() {
     return '1개월 이상'
   }
 
-  // 유틸리티 함수: 진행 상태 판별
-  const getProgressStatus = (progress: number): 'warning' | 'inProgress' | 'good' => {
-    if (progress < 30) return 'warning'
-    if (progress < 70) return 'inProgress'
-    return 'good'
-  }
-
-  // 유틸리티 함수: 진행률별 색상
-  const getProgressColorClass = (progress: number): string => {
-    if (progress < 30) return 'bg-red-500'
-    if (progress < 70) return 'bg-yellow-500'
-    return 'bg-green-500'
+  // 유틸리티 함수: 단어장 회차 뱃지 스타일 결정
+  const getSessionBadgeVariant = (current: number, total: number): 'default' | 'secondary' | 'outline' => {
+    if (total === 0) return 'outline'  // 회차 없음
+    if (current >= total) return 'default'     // 완료 - 초록
+    if (current > 0) return 'secondary'        // 진행중 - 파랑
+    return 'outline'                           // 미시작 - 회색
   }
 
   // 정렬 함수
@@ -828,9 +754,6 @@ export default function TeacherDashboard() {
       switch (sortField) {
         case 'name':
           comparison = a.name.localeCompare(b.name, 'ko')
-          break
-        case 'progress':
-          comparison = a.progress - b.progress
           break
         case 'lastActivity':
           const dateA = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0
@@ -844,7 +767,7 @@ export default function TeacherDashboard() {
   }
 
   // 정렬 토글 핸들러
-  const handleSortToggle = (field: 'name' | 'progress' | 'lastActivity') => {
+  const handleSortToggle = (field: 'name' | 'lastActivity') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
     } else {
@@ -853,75 +776,21 @@ export default function TeacherDashboard() {
     }
   }
 
-  // 필터링 + 정렬 적용
+  // 필터링 + 정렬 적용 (검색만 적용, 진행률 필터 제거)
   const filteredStudents = sortStudents(
     students.filter(student => {
-      // 검색 필터
-      const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase())
-
-      // 진행 상태 필터
-      const matchesProgress = progressFilter === 'all' || getProgressStatus(student.progress) === progressFilter
-
-      return matchesSearch && matchesProgress
+      // 검색 필터만 적용
+      return student.name.toLowerCase().includes(searchQuery.toLowerCase())
     })
   )
 
-  // 드래그 앤 드롭 센서 설정
-  const studentSensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
+  // 드래그 앤 드롭 센서 설정 (단어장용)
   const wordlistSensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
-
-  // 학생 드래그 종료 핸들러
-  const handleStudentDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-
-    if (!over || active.id === over.id) {
-      return
-    }
-
-    const oldIndex = students.findIndex((s) => s.id === active.id)
-    const newIndex = students.findIndex((s) => s.id === over.id)
-
-    if (oldIndex === -1 || newIndex === -1) {
-      return
-    }
-
-    // 로컬 상태 업데이트
-    const newStudents = arrayMove(students, oldIndex, newIndex)
-    setStudents(newStudents)
-
-    // DB 업데이트 (순서 저장)
-    try {
-      const updates = newStudents.map((student, index) => ({
-        id: student.id,
-        display_order: index
-      }))
-
-      for (const update of updates) {
-        await (supabase as any)
-          .from('users')
-          .update({ display_order: update.display_order })
-          .eq('id', update.id)
-      }
-
-      console.log('✅ 학생 순서 저장 완료')
-    } catch (error) {
-      console.error('❌ 학생 순서 저장 실패:', error)
-      alert('순서 저장에 실패했습니다.')
-      // 실패 시 다시 로드
-      loadDashboardData()
-    }
-  }
 
   // 단어장 드래그 종료 핸들러
   const handleWordlistDragEnd = async (event: DragEndEvent) => {
@@ -1084,19 +953,6 @@ export default function TeacherDashboard() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="max-w-xs"
                   />
-
-                  {/* 진행 상태 필터 */}
-                  <Select value={progressFilter} onValueChange={(value) => setProgressFilter(value as 'all' | 'warning' | 'inProgress' | 'good')}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="진행 상태" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">전체</SelectItem>
-                      <SelectItem value="warning">주의 필요 (0-30%)</SelectItem>
-                      <SelectItem value="inProgress">진행 중 (30-70%)</SelectItem>
-                      <SelectItem value="good">양호 (70%+)</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 {/* 전체 선택 + 선택 삭제 버튼 */}
@@ -1140,97 +996,78 @@ export default function TeacherDashboard() {
                 검색 결과가 없습니다
               </div>
             ) : (
-              <Table>
+              <Table className="text-sm">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
+                  <TableRow className="h-8">
+                    <TableHead className="w-8 py-1 px-2"></TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      className="py-1 cursor-pointer hover:bg-accent/50 transition-colors"
                       onClick={() => handleSortToggle('name')}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-xs">
                         이름
                         {sortField === 'name' ? (
-                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                          sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                         ) : (
-                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
                         )}
                       </div>
                     </TableHead>
+                    <TableHead className="py-1 text-xs">단어장 현황</TableHead>
                     <TableHead
-                      className="cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={() => handleSortToggle('progress')}
-                    >
-                      <div className="flex items-center gap-2">
-                        진행률
-                        {sortField === 'progress' ? (
-                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                        ) : (
-                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    </TableHead>
-                    <TableHead>회차</TableHead>
-                    <TableHead>O-TEST</TableHead>
-                    <TableHead>X-TEST</TableHead>
-                    <TableHead
-                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      className="py-1 cursor-pointer hover:bg-accent/50 transition-colors"
                       onClick={() => handleSortToggle('lastActivity')}
                     >
-                      <div className="flex items-center gap-2">
-                        최근활동
+                      <div className="flex items-center gap-1 text-xs">
+                        최근
                         {sortField === 'lastActivity' ? (
-                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                          sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
                         ) : (
-                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                          <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
                         )}
                       </div>
                     </TableHead>
-                    <TableHead className="text-right">액션</TableHead>
+                    <TableHead className="py-1 text-right text-xs w-20">액션</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredStudents.map((student) => (
-                    <TableRow key={student.id}>
+                    <TableRow key={student.id} className="h-9">
                       {/* 체크박스 */}
-                      <TableCell>
+                      <TableCell className="py-1 px-2">
                         <Checkbox
                           checked={selectedStudents.includes(student.id)}
                           onCheckedChange={() => toggleStudentSelection(student.id)}
+                          className="h-4 w-4"
                         />
                       </TableCell>
 
                       {/* 이름 */}
-                      <TableCell>
+                      <TableCell className="py-1">
                         {editingStudentId === student.id ? (
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={editingStudentName}
-                              onChange={(e) => setEditingStudentName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveStudentName()
-                                else if (e.key === 'Escape') handleCancelStudentEdit()
-                              }}
-                              className="h-8 w-32"
-                              autoFocus
-                              onBlur={handleSaveStudentName}
-                            />
-                          </div>
+                          <Input
+                            value={editingStudentName}
+                            onChange={(e) => setEditingStudentName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveStudentName()
+                              else if (e.key === 'Escape') handleCancelStudentEdit()
+                            }}
+                            className="h-6 w-28 text-sm"
+                            autoFocus
+                            onBlur={handleSaveStudentName}
+                          />
                         ) : (
-                          <div className="flex items-center gap-2 group">
+                          <div className="flex items-center gap-1 group">
                             <span
-                              className="font-semibold cursor-pointer hover:text-blue-600 hover:underline"
-                              onClick={() => {
-                                setSelectedStudentForManagement(student)
-                                setStudentManagementOpen(true)
-                              }}
+                              className="text-sm font-medium cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={() => window.open(`/teacher/students/${student.id}`, '_blank')}
                             >
                               {student.name}
                             </span>
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
                               onClick={() => handleEditStudentName(student.id, student.name)}
                             >
                               <Edit2 className="w-3 h-3 text-muted-foreground" />
@@ -1239,46 +1076,39 @@ export default function TeacherDashboard() {
                         )}
                       </TableCell>
 
-                      {/* 진행률 */}
-                      <TableCell>
-                        <div className="flex items-center gap-2 min-w-[120px]">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${getProgressColorClass(student.progress)}`}
-                              style={{ width: `${student.progress}%` }}
-                            />
+                      {/* 단어장 현황 */}
+                      <TableCell className="py-1">
+                        {student.wordlists.length === 0 ? (
+                          <span className="text-muted-foreground text-xs">
+                            배정 없음
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-0.5">
+                            {student.wordlists.map((wl) => (
+                              <Badge
+                                key={wl.id}
+                                variant={getSessionBadgeVariant(wl.currentSession, wl.totalSessions)}
+                                className={`gap-0.5 text-xs py-0 px-1.5 h-5 ${
+                                  wl.currentSession >= wl.totalSessions
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : wl.currentSession > 0
+                                    ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                    : ''
+                                }`}
+                              >
+                                {wl.name} {wl.currentSession}/{wl.totalSessions}
+                                {wl.currentSession >= wl.totalSessions && wl.totalSessions > 0 && (
+                                  <CheckCircle2 className="w-3 h-3" />
+                                )}
+                              </Badge>
+                            ))}
                           </div>
-                          <span className="text-sm font-medium w-12 text-right">{student.progress}%</span>
-                        </div>
-                      </TableCell>
-
-                      {/* 회차 */}
-                      <TableCell>
-                        <Badge variant="outline" className="gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          {student.completedSessions}/{student.totalSessions}
-                        </Badge>
-                      </TableCell>
-
-                      {/* O-TEST */}
-                      <TableCell>
-                        <Badge variant="secondary" className="gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-green-600" />
-                          {student.oTestCompleted}
-                        </Badge>
-                      </TableCell>
-
-                      {/* X-TEST */}
-                      <TableCell>
-                        <Badge variant="secondary" className="gap-1">
-                          <XCircle className="w-3 h-3 text-red-600" />
-                          {student.xTestCompleted}
-                        </Badge>
+                        )}
                       </TableCell>
 
                       {/* 최근 활동 */}
-                      <TableCell>
-                        <span className={`text-sm ${
+                      <TableCell className="py-1">
+                        <span className={`text-xs ${
                           !student.lastActivityAt ? 'text-muted-foreground' :
                           formatRelativeTime(student.lastActivityAt) === '오늘' ? 'text-green-600 font-medium' :
                           formatRelativeTime(student.lastActivityAt).includes('주') ? 'text-orange-600' :
@@ -1289,36 +1119,38 @@ export default function TeacherDashboard() {
                       </TableCell>
 
                       {/* 액션 */}
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                      <TableCell className="py-1 text-right">
+                        <div className="flex justify-end gap-0.5">
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => student.accessToken && openStudentDashboard(student.accessToken)}
                             disabled={!student.accessToken}
                             title="데스크톱 대시보드"
+                            className="h-6 w-6 p-0"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => {
                               const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
                               window.open(link, '_blank')
                             }}
                             title="모바일 대시보드"
+                            className="h-6 w-6 p-0"
                           >
-                            <Smartphone className="w-3 h-3" />
+                            <Smartphone className="w-3.5 h-3.5" />
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => handleDeleteStudent(student.id, student.name)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                             title="학생 삭제"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1585,21 +1417,6 @@ export default function TeacherDashboard() {
         wordlistId={printWordlistId}
         title={printWordlistTitle}
       />
-
-      {/* 학생 관리 모달 */}
-      {selectedStudentForManagement && (
-        <StudentManagementDialog
-          open={studentManagementOpen}
-          onClose={() => {
-            setStudentManagementOpen(false)
-            setSelectedStudentForManagement(null)
-          }}
-          studentId={selectedStudentForManagement.id}
-          studentName={selectedStudentForManagement.name}
-          accessToken={selectedStudentForManagement.accessToken || ''}
-          onDataChanged={loadDashboardData}
-        />
-      )}
     </div>
   )
 }
