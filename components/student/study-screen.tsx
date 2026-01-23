@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Progress } from '@/components/ui/progress'
 import { useStudySession } from '@/hooks/useStudySession'
 import { useTTS } from '@/hooks/useTTS'
-import { Loader2, Volume2 } from 'lucide-react'
+import { Loader2, Volume2, BookOpen } from 'lucide-react'
 
 // 모달 컴포넌트 동적 임포트 (초기 번들 크기 감소)
 const SkipModalMinimal = dynamic(() =>
@@ -52,7 +53,25 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   } = useStudySession(token, assignmentId)
 
   // TTS (발음 재생)
-  const { speak, isPlaying, isLoading: ttsLoading } = useTTS()
+  const { speak, prefetchTTS, isPlaying, isLoading: ttsLoading } = useTTS()
+
+  // ⭐ 현재 단어 변경 시 TTS 프리페칭
+  useEffect(() => {
+    if (currentWord?.word_text) {
+      prefetchTTS(currentWord.word_text)
+    }
+  }, [currentWord?.word_text, prefetchTTS])
+
+  // ⭐ 진행률 계산 (조건부 return 전에 배치 - Hook 순서 보장)
+  const progressPercentage = useMemo(() => {
+    if (!progress || progress.todayGoal === 0) return 0
+    return Math.round((progress.today / progress.todayGoal) * 100)
+  }, [progress])
+
+  const generationProgressPercentage = useMemo(() => {
+    if (!progress || progress.generationTotal === 0) return 0
+    return Math.round((progress.generationCompleted / progress.generationTotal) * 100)
+  }, [progress])
 
   const [skipModalOpen, setSkipModalOpen] = useState(false)
   const [skipModalType, setSkipModalType] = useState<'minimal' | 'medium'>('minimal')
@@ -340,12 +359,52 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   }
 
   if (loading) {
+    // ⭐ 스켈레톤 UI - 실제 레이아웃과 동일한 구조
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-lg text-muted-foreground">로딩 중...</p>
+      <div className="h-[100dvh] flex flex-col">
+        {/* 상단 헤더 스켈레톤 */}
+        <header className="flex-shrink-0 h-14 px-4 flex items-center justify-between border-b bg-white/95">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
+            <div className="w-12 h-4 bg-gray-200 rounded animate-pulse" />
+          </div>
+          <div className="flex-1 mx-4 max-w-[200px]">
+            <div className="w-full h-2 bg-gray-200 rounded-full animate-pulse" />
+          </div>
+          <div className="w-8 h-4 bg-gray-200 rounded animate-pulse" />
+        </header>
+
+        {/* 단어 영역 스켈레톤 */}
+        <section className="flex-1 min-h-0 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
+          <div className="text-center">
+            <div className="h-16 w-48 bg-gray-200 rounded-lg animate-pulse mx-auto" />
+          </div>
+        </section>
+
+        {/* 버튼 영역 스켈레톤 */}
+        <div className="flex-shrink-0 py-4 flex items-center justify-center px-4 bg-white border-t">
+          <div className="flex gap-3 max-w-md w-full">
+            <div className="flex-1 h-14 bg-gray-200 rounded-md animate-pulse" />
+            <div className="flex-1 h-14 bg-gray-200 rounded-md animate-pulse" />
+          </div>
         </div>
+
+        {/* 완료 목록 스켈레톤 */}
+        <section className="h-[40dvh] border-t bg-muted/10">
+          <div className="p-3 h-full">
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-4 min-h-[56px] bg-white rounded-lg border animate-pulse">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-4 bg-gray-200 rounded" />
+                    <div className="w-24 h-4 bg-gray-200 rounded" />
+                    <div className="w-16 h-3 bg-gray-100 rounded" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       </div>
     )
   }
@@ -515,17 +574,6 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
     )
   }
 
-  // 진행률 계산 메모화
-  const progressPercentage = useMemo(() => {
-    if (!progress || progress.todayGoal === 0) return 0
-    return Math.round((progress.today / progress.todayGoal) * 100)
-  }, [progress])
-
-  const generationProgressPercentage = useMemo(() => {
-    if (!progress || progress.generationTotal === 0) return 0
-    return Math.round((progress.generationCompleted / progress.generationTotal) * 100)
-  }, [progress])
-
   const meaningLength = currentWord?.meaning?.length ?? 0
   const meaningFontClass = (() => {
     if (meaningLength <= 6) {
@@ -541,9 +589,31 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   })()
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* 1. 학습 단어 영역 - 화면의 30% */}
-      <section className="h-[30vh] flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
+    <div className="h-[100dvh] flex flex-col">
+      {/* 상단 헤더: 진행률 */}
+      <header className="flex-shrink-0 h-14 px-4 flex items-center justify-between border-b bg-white/95 backdrop-blur-sm z-10">
+        {/* 왼쪽: 회차 정보 */}
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">{progress.session}회차</span>
+        </div>
+
+        {/* 중앙: 진행률 바 */}
+        <div className="flex-1 mx-4 max-w-[200px]">
+          <div className="text-xs text-center text-muted-foreground mb-1">
+            {progress.today}/{progress.todayGoal}
+          </div>
+          <Progress value={progressPercentage} className="h-2" />
+        </div>
+
+        {/* 오른쪽: 전체 진도 */}
+        <div className="text-sm text-muted-foreground">
+          {generationProgressPercentage}%
+        </div>
+      </header>
+
+      {/* 1. 학습 단어 영역 - 유연하게 확장 */}
+      <section className="flex-1 min-h-0 flex items-center justify-center bg-gradient-to-b from-background to-muted/20 px-4">
         <div className="text-center max-w-full px-4">
           {!showMeaning ? (
             <div className="flex items-center justify-center gap-2 animate-in fade-in zoom-in duration-300">
@@ -584,33 +654,33 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
         </div>
       </section>
 
-      {/* 2. 버튼 영역 - 화면의 20% (골드존) */}
-      <div className="h-[20vh] flex items-center justify-center px-4">
-        <div className="flex gap-4">
-          <Button 
-            size="lg" 
+      {/* 2. 버튼 영역 - 고정 높이, Safe Area 대응 */}
+      <div className="flex-shrink-0 py-4 flex items-center justify-center px-4 bg-white border-t">
+        <div className="flex gap-3 max-w-md w-full">
+          <Button
+            size="lg"
             onClick={onKnowClick}
             disabled={isProcessing}
-            className="min-w-[120px] text-lg h-14 shadow-lg"
+            className="flex-1 text-lg h-14 font-semibold shadow-lg"
           >
             {isProcessing ? '처리 중...' : showMeaning ? '확인' : '안다'}
           </Button>
-          <Button 
-            size="lg" 
-            variant="outline" 
+          <Button
+            size="lg"
+            variant="outline"
             onClick={showMeaning ? onMeaningDontKnow : onDontKnowClick}
-            className="min-w-[120px] text-lg h-14 shadow-lg bg-white"
+            className="flex-1 text-lg h-14 font-semibold shadow-lg bg-white"
           >
             모른다
           </Button>
         </div>
       </div>
 
-      {/* 3. 완료 목록 영역 - 화면의 50% */}
-      <section className="h-[50vh] border-t bg-muted/10">
+      {/* 3. 완료 목록 영역 - 화면의 40% */}
+      <section className="h-[40dvh] border-t bg-muted/10">
         <div className="p-3 h-full">
           <ScrollArea className="h-full">
-            <div className="space-y-1">
+            <div className="space-y-2">
               {completedWords.length === 0 ? (
                 <Card className="p-6 text-center">
                   <p className="text-muted-foreground text-sm">
@@ -619,21 +689,21 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
                 </Card>
               ) : (
                 completedWords.map((word, idx) => (
-                  <Card 
+                  <Card
                     key={`${word.id}-${idx}`}
-                    className="p-2 hover:bg-accent/50 transition-all hover:shadow-md animate-in slide-in-from-top duration-200"
+                    className="p-4 min-h-[56px] flex items-center hover:bg-accent/50 transition-all hover:shadow-md animate-in slide-in-from-top duration-200"
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
+                    <div className="flex justify-between items-center w-full">
+                      <div className="flex items-center gap-3">
                         <span className="text-muted-foreground font-medium min-w-[2ch] text-sm">
                           {completedWords.length - idx}.
                         </span>
                         <span className="font-semibold text-base">
                           {word.word_text}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          - {word.meaning}
+                        <span className="text-sm text-muted-foreground">
+                          {word.meaning}
                         </span>
                       </div>
                       {idx === 0 && (

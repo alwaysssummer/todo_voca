@@ -147,6 +147,10 @@ export function useStudySession(token: string, assignmentId?: string | null) {
   const targetWordIdsRef = useRef<number[] | null>(null)  // ⭐ targetWordIds 캐싱
   const targetWordIdsAssignmentIdRef = useRef<string | null>(null)  // ⭐ 캐시된 assignment ID 추적
 
+  // ⭐ 다음 단어 프리페칭을 위한 ref
+  const prefetchedNextWordRef = useRef<Word | null>(null)
+  const isPrefetchingRef = useRef(false)
+
   // 학생 정보 및 현재 활성 assignment 가져오기
   useEffect(() => {
     async function fetchStudentAndAssignment() {
@@ -566,6 +570,49 @@ export function useStudySession(token: string, assignmentId?: string | null) {
       fetchTodayCompletedWords()
     }
   }, [student, currentAssignment])
+
+  // ⭐ 다음 단어 프리페칭 함수
+  const prefetchNextWord = async () => {
+    if (!student || !currentAssignment || isPrefetchingRef.current) return
+    if (isGeneratingReview || showGenerationCompleteModal) return
+
+    isPrefetchingRef.current = true
+    try {
+      const currentSession = currentAssignment.current_session
+      const { data, error } = await (supabase as any)
+        .rpc('get_next_word', {
+          p_student_id: student.id,
+          p_assignment_id: currentAssignment.id,
+          p_current_session: currentSession
+        })
+
+      if (!error && data && data.length > 0) {
+        // 현재 단어와 다른 단어만 프리페치
+        if (data[0].id !== currentWord?.id) {
+          prefetchedNextWordRef.current = data[0]
+          console.log('🔮 [프리페칭] 다음 단어 준비 완료:', data[0].word_text)
+        }
+      } else {
+        prefetchedNextWordRef.current = null
+      }
+    } catch (err) {
+      console.error('🔮 [프리페칭] 오류:', err)
+      prefetchedNextWordRef.current = null
+    } finally {
+      isPrefetchingRef.current = false
+    }
+  }
+
+  // ⭐ 현재 단어가 변경되면 다음 단어 프리페칭
+  useEffect(() => {
+    if (currentWord && student && currentAssignment) {
+      // 약간의 딜레이 후 프리페칭 (현재 단어 표시 후)
+      const timer = setTimeout(() => {
+        prefetchNextWord()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [currentWord?.id])
 
   // ⭐ 대상 단어 ID 가져오기 (헬퍼 함수) - 캐싱 적용
   const getTargetWordIds = async (): Promise<number[]> => {
@@ -990,21 +1037,50 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     }
   }
 
-  // [안다] 버튼 클릭
+  // [안다] 버튼 클릭 - ⭐ 낙관적 업데이트 적용
   const handleKnow = async () => {
     if (!currentWord || !student || !currentAssignment || !currentWordlist) return
 
-    // ⭐ 비동기 작업 시작 시 assignment_id 캡처 (탭 전환 대응)
+    // ⭐ 비동기 작업 시작 시 상태 캡처 (탭 전환 대응)
     const capturedAssignmentId = currentAssignment.id
     const capturedStudentId = student.id
     const capturedWordId = currentWord.id
+    const capturedWord = currentWord
+    const today = new Date().toISOString().split('T')[0]
+    const currentSession = progress.session  // ⭐ 현재 회차
+    const previousStudied = progress.generationCompleted
+    const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
+
+    // ========================================
+    // 🚀 1단계: 낙관적 UI 업데이트 (즉시 실행)
+    // ========================================
+
+    // 1-1. 완료 목록에 즉시 추가
+    setCompletedWords(prev => [capturedWord, ...prev])
+
+    // 1-2. 진행률 즉시 업데이트 (로컬 계산)
+    const optimisticProgress = calculateProgress(
+      progress.generationCompleted + 1,
+      0,  // skippedCount - 임시값
+      currentAssignment.session_goal,
+      totalWordCount
+    )
+    setProgress(optimisticProgress)
+
+    // 1-3. 프리페치된 단어가 있으면 즉시 표시
+    const prefetchedWord = prefetchedNextWordRef.current
+    if (prefetchedWord && prefetchedWord.id !== capturedWordId) {
+      console.log('🚀 [낙관적 업데이트] 프리페치된 단어 즉시 표시:', prefetchedWord.word_text)
+      setCurrentWord(prefetchedWord)
+      prefetchedNextWordRef.current = null
+    }
 
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const currentSession = progress.session  // ⭐ 현재 회차
-      const previousStudied = progress.generationCompleted
+      // ========================================
+      // 🔄 2단계: 백그라운드 DB 동기화
+      // ========================================
 
-      // 진도 업데이트
+      // 2-1. 진도 업데이트 (DB)
       const { error } = await (supabase as any)
         .from('student_word_progress')
         .upsert({
@@ -1026,22 +1102,10 @@ export function useStudySession(token: string, assignmentId?: string | null) {
         return { goalAchieved: false, aborted: true }
       }
 
-      // 완료 목록에 추가
-      setCompletedWords([currentWord, ...completedWords])
-      
-      const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
-      // ⭐ skippedCount는 0으로 전달 (updateProgress에서 실제 값으로 덮어씀)
-      let progressAfterKnow = calculateProgress(
-        progress.generationCompleted + 1,
-        0,  // skippedCount - 임시값
-        currentAssignment.session_goal,
-        totalWordCount
-      )
-
+      // 2-2. 서버에서 정확한 진행률 확인 (백그라운드)
+      let progressAfterKnow = optimisticProgress
       if (currentAssignment && currentWordlist) {
         progressAfterKnow = await updateProgress(student.id, currentAssignment, currentWordlist)
-      } else {
-        setProgress(progressAfterKnow)
       }
 
       const newCompleted = progressAfterKnow.generationCompleted
@@ -1187,12 +1251,20 @@ export function useStudySession(token: string, assignmentId?: string | null) {
         }
       }
 
-      // C. 일반 단어 완료 - 다음 단어 로드
-      await fetchNextWord()
-      
+      // C. 일반 단어 완료 - 프리페치된 단어가 없으면 다음 단어 로드
+      if (!prefetchedWord || prefetchedWord.id === capturedWordId) {
+        console.log('🔄 [handleKnow] 프리페치 없음, fetchNextWord() 호출')
+        await fetchNextWord()
+      } else {
+        console.log('✅ [handleKnow] 프리페치된 단어로 이미 전환됨')
+      }
+
       return { goalAchieved: false }
     } catch (err) {
       console.error('단어 완료 처리 실패:', err)
+      // ⭐ 에러 시 롤백: 이전 상태로 복원
+      console.warn('⚠️ [handleKnow] DB 오류로 UI 롤백')
+      setCompletedWords(prev => prev.filter(w => w.id !== capturedWordId))
       throw err
     }
   }

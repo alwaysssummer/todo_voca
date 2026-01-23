@@ -10,6 +10,10 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer
 }
 
+// ⭐ TTS 캐시 (모듈 레벨 - 컴포넌트 간 공유)
+const audioCache = new Map<string, ArrayBuffer>()
+const CACHE_MAX_SIZE = 50  // 최대 50개 단어 캐시
+
 export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -17,6 +21,7 @@ export function useTTS() {
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null)
   const isLoadingRef = useRef(false)
   const voicesRef = useRef<SpeechSynthesisVoice[]>([])
+  const prefetchingRef = useRef<Set<string>>(new Set())  // 프리페칭 중인 텍스트 추적
 
   // AudioContext 초기화 (싱글톤)
   const getAudioContext = useCallback(() => {
@@ -42,6 +47,59 @@ export function useTTS() {
     return () => speechSynthesis.removeEventListener('voiceschanged', loadVoices)
   }, [])
 
+  // ⭐ TTS 데이터 가져오기 (캐시 확인 후 API 호출)
+  const fetchTTSData = useCallback(async (text: string): Promise<ArrayBuffer> => {
+    // 캐시 확인
+    if (audioCache.has(text)) {
+      console.log('🔮 [TTS] 캐시에서 로드:', text)
+      return audioCache.get(text)!
+    }
+
+    // API 호출
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'TTS request failed')
+    }
+
+    const { audioContent } = await response.json()
+    const arrayBuffer = base64ToArrayBuffer(audioContent)
+
+    // 캐시에 저장 (크기 제한)
+    if (audioCache.size >= CACHE_MAX_SIZE) {
+      // 가장 오래된 항목 삭제 (FIFO)
+      const firstKey = audioCache.keys().next().value
+      if (firstKey) audioCache.delete(firstKey)
+    }
+    audioCache.set(text, arrayBuffer)
+    console.log('💾 [TTS] 캐시에 저장:', text, `(${audioCache.size}/${CACHE_MAX_SIZE})`)
+
+    return arrayBuffer
+  }, [])
+
+  // ⭐ 프리페칭 함수 (다음 단어 TTS 미리 로드)
+  const prefetchTTS = useCallback(async (text: string) => {
+    // 이미 캐시에 있거나 프리페칭 중이면 스킵
+    if (audioCache.has(text) || prefetchingRef.current.has(text)) {
+      return
+    }
+
+    prefetchingRef.current.add(text)
+    try {
+      await fetchTTSData(text)
+      console.log('🔮 [TTS] 프리페칭 완료:', text)
+    } catch (error) {
+      console.warn('🔮 [TTS] 프리페칭 실패:', text)
+    } finally {
+      prefetchingRef.current.delete(text)
+    }
+  }, [fetchTTSData])
+
   const speak = useCallback(async (text: string) => {
     // 이미 재생 중이면 중지
     if (sourceNodeRef.current) {
@@ -65,24 +123,12 @@ export function useTTS() {
         console.log('🔓 [TTS] AudioContext resumed')
       }
 
-      // 2. TTS API 호출
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
+      // 2. TTS 데이터 가져오기 (캐시 또는 API)
+      const arrayBuffer = await fetchTTSData(text)
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'TTS request failed')
-      }
-
-      const { audioContent } = await response.json()
-      console.log('✅ [TTS] Google TTS API 응답 성공')
-
-      // 3. Base64 → ArrayBuffer → AudioBuffer
-      const arrayBuffer = base64ToArrayBuffer(audioContent)
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
+      // 3. ArrayBuffer → AudioBuffer (decodeAudioData는 원본을 detach하므로 복사본 사용)
+      const arrayBufferCopy = arrayBuffer.slice(0)
+      const audioBuffer = await audioContext.decodeAudioData(arrayBufferCopy)
 
       // 4. AudioBufferSourceNode로 재생
       const sourceNode = audioContext.createBufferSource()
@@ -98,7 +144,7 @@ export function useTTS() {
       setIsPlaying(true)
       sourceNode.start(0)
 
-      console.log('🔊 [TTS] Google TTS 재생 시작')
+      console.log('🔊 [TTS] 재생 시작:', text)
     } catch (error: any) {
       console.warn('⚠️ [TTS] Google TTS 실패:', error.message, '→ 브라우저 TTS로 폴백')
       fallbackSpeak(text)
@@ -106,7 +152,7 @@ export function useTTS() {
       isLoadingRef.current = false
       setIsLoading(false)
     }
-  }, [getAudioContext])
+  }, [getAudioContext, fetchTTSData])
 
   // 브라우저 기본 TTS 폴백
   const fallbackSpeak = useCallback((text: string) => {
@@ -146,6 +192,6 @@ export function useTTS() {
     setIsPlaying(false)
   }, [])
 
-  return { speak, stop, isPlaying, isLoading }
+  return { speak, stop, prefetchTTS, isPlaying, isLoading }
 }
 
