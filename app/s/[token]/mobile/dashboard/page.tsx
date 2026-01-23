@@ -4,10 +4,14 @@ interface PageProps {
   params: Promise<{
     token: string
   }>
+  searchParams: Promise<{
+    assignment?: string
+  }>
 }
 
-export default async function MobileDashboardPage({ params }: PageProps) {
+export default async function MobileDashboardPage({ params, searchParams }: PageProps) {
   const { token } = await params
-  return <MobileDashboard token={token} />
+  const { assignment } = await searchParams
+  return <MobileDashboard token={token} initialAssignmentId={assignment} />
 }
 

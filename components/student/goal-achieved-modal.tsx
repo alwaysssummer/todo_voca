@@ -19,17 +19,19 @@ interface GoalAchievedModalProps {
   completedWordlistId: string
   studentToken: string
   totalSessions?: number
+  assignmentId?: string
 }
 
-export function GoalAchievedModal({ 
-  open, 
-  onClose, 
+export function GoalAchievedModal({
+  open,
+  onClose,
   completedCount,
   goal,
   dayNumber,
   completedWordlistId,
   studentToken,
-  totalSessions
+  totalSessions,
+  assignmentId
 }: GoalAchievedModalProps) {
   const router = useRouter()
 
@@ -37,9 +39,11 @@ export function GoalAchievedModal({
     // sessionStorage 또는 URL 경로로 모바일 모드 판단
     const isMobile = sessionStorage.getItem('dashboardMode') === 'mobile' ||
                      window.location.pathname.includes('/mobile/')
-    const dashboardPath = isMobile 
-      ? `/s/${studentToken}/mobile/dashboard`
-      : `/s/${studentToken}/dashboard`
+    // assignmentId가 있으면 URL 파라미터로 전달하여 해당 탭 선택
+    const assignmentParam = assignmentId ? `?assignment=${assignmentId}` : ''
+    const dashboardPath = isMobile
+      ? `/s/${studentToken}/mobile/dashboard${assignmentParam}`
+      : `/s/${studentToken}/dashboard${assignmentParam}`
     router.push(dashboardPath)
   }
 

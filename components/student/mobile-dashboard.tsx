@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,9 +24,10 @@ import { TestResultModal } from '@/components/student/test-result-modal'
 
 interface MobileDashboardProps {
   token: string
+  initialAssignmentId?: string
 }
 
-export function MobileDashboard({ token }: MobileDashboardProps) {
+export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardProps) {
   const router = useRouter()
   const { data, loading, error } = useStudentDashboard(token)
 
@@ -51,6 +52,16 @@ export function MobileDashboard({ token }: MobileDashboardProps) {
 
   // 단어장 탭 선택 상태
   const [selectedTabIndex, setSelectedTabIndex] = useState<number>(0)
+
+  // ⭐ initialAssignmentId가 있으면 해당 단어장 탭 선택
+  useEffect(() => {
+    if (initialAssignmentId && assignments.length > 0) {
+      const index = assignments.findIndex(a => a.id === initialAssignmentId)
+      if (index !== -1) {
+        setSelectedTabIndex(index)
+      }
+    }
+  }, [initialAssignmentId, assignments])
 
   // 선택된 단어장
   const selectedAssignment = assignments[selectedTabIndex] || assignments[0] || null

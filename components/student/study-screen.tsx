@@ -665,6 +665,7 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
           completedWordlistId={completedWordlistData?.completedWordlistId || ''}
           studentToken={token}
           totalSessions={student.session_goal > 0 ? Math.ceil(progress.generationTotal / student.session_goal) : undefined}
+          assignmentId={assignmentId}
         />
       )}
 
