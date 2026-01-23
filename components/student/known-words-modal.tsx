@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Printer, Loader2 } from 'lucide-react'
@@ -30,13 +30,7 @@ export function KnownWordsModal({
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    if (open && sessionId) {
-      loadWords()
-    }
-  }, [open, sessionId])
-
-  const loadWords = async () => {
+  const loadWords = useCallback(async () => {
     setLoading(true)
     try {
       const { data: session } = await supabase
@@ -59,7 +53,13 @@ export function KnownWordsModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (open && sessionId) {
+      loadWords()
+    }
+  }, [open, sessionId, loadWords])
 
   const handlePrint = () => {
     // 렌더링 완료 대기

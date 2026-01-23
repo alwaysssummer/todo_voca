@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -90,21 +90,14 @@ export function MergeWordlistDialog({
   const [error, setError] = useState('')
   const [loadingPreview, setLoadingPreview] = useState(true)
 
-  // 미리보기 데이터 로드
-  useEffect(() => {
-    if (open && wordlistIds.length > 0) {
-      loadPreview()
-    }
-  }, [open, wordlistIds])
-
-  const loadPreview = async () => {
+  const loadPreview = useCallback(async () => {
     try {
       setLoadingPreview(true)
-      
+
       // 선택된 단어장 정보 가져오기 (순서 보장)
       const wordlistsData: WordlistInfo[] = []
       let total = 0
-      
+
       for (const id of wordlistIds) {
         const { data: wordlist, error } = await supabase
           .from('wordlists')
@@ -123,23 +116,30 @@ export function MergeWordlistDialog({
 
         total += wordlist.total_words
       }
-      
+
       setWordlistsInfo(wordlistsData)
       setTotalWords(total)
-      
+
       // 기본 이름 제안
       if (!mergedName) {
         const defaultName = `통합 단어장 (${total}개)`
         setMergedName(defaultName)
       }
-      
+
     } catch (err: any) {
       console.error('미리보기 로드 오류:', err)
       setError('단어장 정보를 불러올 수 없습니다')
     } finally {
       setLoadingPreview(false)
     }
-  }
+  }, [wordlistIds, mergedName])
+
+  // 미리보기 데이터 로드
+  useEffect(() => {
+    if (open && wordlistIds.length > 0) {
+      loadPreview()
+    }
+  }, [open, wordlistIds, loadPreview])
 
   const handleMerge = async () => {
     setIsMerging(true)

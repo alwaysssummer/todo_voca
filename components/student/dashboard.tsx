@@ -165,15 +165,13 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   }
 
   // 선택된 단어장 (data가 있을 때만 유효)
-  const assignments = data?.assignments ?? []
+  const assignments = useMemo(() => data?.assignments ?? [], [data?.assignments])
   const currentAssignment = data?.currentAssignment ?? null
   const selectedAssignment = assignments[selectedAssignmentIndex] || currentAssignment
 
-  // 완료된 세션 데이터 (data가 있을 때만 유효)
-  const completedSessionsRaw = data?.completedSessions ?? []
-
   // 선택된 단어장 및 관련 단어장(같은 base_wordlist_id)의 세션 필터링
   const filteredCompletedSessions = useMemo(() => {
+    const completedSessionsRaw = data?.completedSessions ?? []
     if (!selectedAssignment) return []
 
     // 선택된 단어장의 base_wordlist_id (없으면 wordlist_id 사용)
@@ -188,7 +186,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     return completedSessionsRaw.filter(session =>
       relatedAssignmentIds.includes(session.assignment_id)
     )
-  }, [completedSessionsRaw, selectedAssignment, assignments])
+  }, [data?.completedSessions, selectedAssignment, assignments])
 
   const sessions = useMemo(() => {
     const uniqueMap = new Map<string, (typeof filteredCompletedSessions)[number]>()

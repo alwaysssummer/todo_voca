@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -53,31 +53,7 @@ export function ViewWordlistDialog({
   const wordRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const scrollViewportRef = useRef<HTMLDivElement | null>(null)
 
-  useEffect(() => {
-    if (open && wordlistId) {
-      loadWords()
-    }
-  }, [open, wordlistId])
-
-  // ScrollArea Viewport ref 설정
-  useEffect(() => {
-    if (open) {
-      const viewport = document.querySelector('[data-radix-scroll-area-viewport]')
-      scrollViewportRef.current = viewport as HTMLDivElement
-    }
-  }, [open, words])
-
-  // 하이라이트 자동 해제 (3초)
-  useEffect(() => {
-    if (highlightedWordId) {
-      const timer = setTimeout(() => {
-        setHighlightedWordId(null)
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [highlightedWordId])
-
-  const loadWords = async () => {
+  const loadWords = useCallback(async () => {
     setLoading(true)
     setError('')
 
@@ -97,7 +73,31 @@ export function ViewWordlistDialog({
     } finally {
       setLoading(false)
     }
-  }
+  }, [wordlistId])
+
+  useEffect(() => {
+    if (open && wordlistId) {
+      loadWords()
+    }
+  }, [open, wordlistId, loadWords])
+
+  // ScrollArea Viewport ref 설정
+  useEffect(() => {
+    if (open) {
+      const viewport = document.querySelector('[data-radix-scroll-area-viewport]')
+      scrollViewportRef.current = viewport as HTMLDivElement
+    }
+  }, [open, words])
+
+  // 하이라이트 자동 해제 (3초)
+  useEffect(() => {
+    if (highlightedWordId) {
+      const timer = setTimeout(() => {
+        setHighlightedWordId(null)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [highlightedWordId])
 
   const handleJumpToWord = () => {
     const wordNumber = parseInt(jumpToWord)

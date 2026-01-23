@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -45,13 +45,7 @@ export function AssignWordlistDialog({
   const [selectedWordlists, setSelectedWordlists] = useState<string[]>([])
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (open) {
-      loadWordlists()
-    }
-  }, [open, studentId])
-
-  const loadWordlists = async () => {
+  const loadWordlists = useCallback(async () => {
     try {
       // 모든 단어장 가져오기 (display_order로 정렬)
       const { data: allWordlists, error: wordlistsError } = await supabase
@@ -81,7 +75,7 @@ export function AssignWordlistDialog({
       }))
 
       setWordlists(wordlistsWithStatus)
-      
+
       // 기존에 배정된 단어장을 기본 선택
       setSelectedWordlists(
         wordlistsWithStatus
@@ -92,7 +86,13 @@ export function AssignWordlistDialog({
       console.error('단어장 로드 오류:', err)
       setError(err.message || '단어장을 불러오는 중 오류가 발생했습니다')
     }
-  }
+  }, [studentId])
+
+  useEffect(() => {
+    if (open) {
+      loadWordlists()
+    }
+  }, [open, studentId, loadWordlists])
 
   const handleToggle = (wordlistId: string) => {
     setSelectedWordlists(prev =>

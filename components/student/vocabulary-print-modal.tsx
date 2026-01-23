@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Loader2, Printer } from 'lucide-react'
@@ -31,12 +31,6 @@ export function VocabularyPrintModal({
 }: VocabularyPrintModalProps) {
   const [words, setWords] = useState<Word[]>([])
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    if (open && sessionIds && sessionIds.length > 0) {
-      loadWords()
-    }
-  }, [open, sessionIds, type])
 
   // 인쇄 핸들러
   const handlePrint = () => {
@@ -168,7 +162,7 @@ export function VocabularyPrintModal({
     )
   }
 
-  const loadWords = async () => {
+  const loadWords = useCallback(async () => {
     setLoading(true)
     try {
       let allWords: Word[] = []
@@ -226,7 +220,7 @@ export function VocabularyPrintModal({
         allWords = wordData || []
         console.log('가져온 단어 수:', allWords.length)
       }
-      
+
       // 랜덤 추출 없이 전체 사용
       setWords(allWords)
     } catch (error) {
@@ -235,7 +229,13 @@ export function VocabularyPrintModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [sessionIds, type])
+
+  useEffect(() => {
+    if (open && sessionIds && sessionIds.length > 0) {
+      loadWords()
+    }
+  }, [open, sessionIds, type, loadWords])
 
   return (
     <>

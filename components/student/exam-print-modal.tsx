@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Loader2, X, Printer } from 'lucide-react'
@@ -33,12 +33,6 @@ export function ExamPrintModal({
   const [loading, setLoading] = useState(false)
   const [totalWords, setTotalWords] = useState(0) // 추출 전 전체 단어 수
 
-  useEffect(() => {
-    if (open && sessionIds.length > 0) {
-      loadWords()
-    }
-  }, [open, sessionIds, type])
-
   // Fisher-Yates Shuffle 알고리즘
   const shuffleArray = <T,>(array: T[]): T[] => {
     const shuffled = [...array]
@@ -48,6 +42,89 @@ export function ExamPrintModal({
     }
     return shuffled
   }
+
+  const loadWords = useCallback(async () => {
+    setLoading(true)
+    try {
+      // 여러 회차의 데이터 가져오기
+      type SessionData = Pick<CompletedWordlist, 'id' | 'word_ids' | 'unknown_word_ids'>
+      const { data: sessions, error: sessionsError } = await supabase
+        .from('completed_wordlists')
+        .select('id, word_ids, unknown_word_ids')
+        .in('id', sessionIds)
+        .returns<SessionData[]>()
+
+      if (sessionsError) throw sessionsError
+
+      if (!sessions || sessions.length === 0) {
+        console.log('선택된 회차 데이터가 없습니다')
+        setWords([])
+        return
+      }
+
+      console.log('가져온 세션들:', sessions)
+
+      // 타입에 따라 단어 ID 수집
+      const wordIds: number[] = []
+      sessions.forEach(session => {
+        if (type === 'known' && session.word_ids) {
+          wordIds.push(...session.word_ids)
+        } else if (type === 'unknown' && session.unknown_word_ids) {
+          wordIds.push(...session.unknown_word_ids)
+        }
+      })
+
+      console.log(`${type === 'known' ? '아는' : '모르는'} 단어 ID (중복 포함):`, wordIds.length)
+
+      // 중복 제거
+      const uniqueWordIds = Array.from(new Set(wordIds))
+      console.log('중복 제거 후:', uniqueWordIds.length)
+
+      if (uniqueWordIds.length === 0) {
+        console.log('단어가 없습니다')
+        setWords([])
+        return
+      }
+
+      // 단어 정보 가져오기
+      const { data: wordData, error: wordError } = await supabase
+        .from('words')
+        .select('id, word_text, meaning, sequence_order')
+        .in('id', uniqueWordIds)
+        .order('sequence_order')
+
+      if (wordError) throw wordError
+
+      const allWords = wordData || []
+      console.log('가져온 전체 단어 수:', allWords.length)
+      setTotalWords(allWords.length)
+
+      // 랜덤 추출: known은 30%, unknown은 70%
+      const percentage = type === 'known' ? 0.3 : 0.7
+      const targetCount = Math.ceil(allWords.length * percentage)
+
+      console.log(`${type === 'known' ? '30%' : '70%'} 추출:`, targetCount, '개')
+
+      // Fisher-Yates Shuffle로 랜덤화 후 필요한 개수만 추출
+      const shuffled = shuffleArray(allWords)
+      const selectedWords = shuffled.slice(0, targetCount)
+
+      console.log('최종 선택된 단어:', selectedWords.length, '개')
+      setWords(selectedWords)
+    } catch (error) {
+      console.error('단어 로드 실패:', error)
+      setWords([])
+      setTotalWords(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [sessionIds, type])
+
+  useEffect(() => {
+    if (open && sessionIds.length > 0) {
+      loadWords()
+    }
+  }, [open, sessionIds, type, loadWords])
 
   // 인쇄 핸들러
   const handlePrint = () => {
@@ -256,83 +333,6 @@ export function ExamPrintModal({
         </div>
       </div>
     )
-  }
-
-  const loadWords = async () => {
-    setLoading(true)
-    try {
-      // 여러 회차의 데이터 가져오기
-      type SessionData = Pick<CompletedWordlist, 'id' | 'word_ids' | 'unknown_word_ids'>
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('completed_wordlists')
-        .select('id, word_ids, unknown_word_ids')
-        .in('id', sessionIds)
-        .returns<SessionData[]>()
-
-      if (sessionsError) throw sessionsError
-
-      if (!sessions || sessions.length === 0) {
-        console.log('선택된 회차 데이터가 없습니다')
-        setWords([])
-        return
-      }
-
-      console.log('가져온 세션들:', sessions)
-
-      // 타입에 따라 단어 ID 수집
-      const wordIds: number[] = []
-      sessions.forEach(session => {
-        if (type === 'known' && session.word_ids) {
-          wordIds.push(...session.word_ids)
-        } else if (type === 'unknown' && session.unknown_word_ids) {
-          wordIds.push(...session.unknown_word_ids)
-        }
-      })
-
-      console.log(`${type === 'known' ? '아는' : '모르는'} 단어 ID (중복 포함):`, wordIds.length)
-
-      // 중복 제거
-      const uniqueWordIds = Array.from(new Set(wordIds))
-      console.log('중복 제거 후:', uniqueWordIds.length)
-
-      if (uniqueWordIds.length === 0) {
-        console.log('단어가 없습니다')
-        setWords([])
-        return
-      }
-
-      // 단어 정보 가져오기
-      const { data: wordData, error: wordError } = await supabase
-        .from('words')
-        .select('id, word_text, meaning, sequence_order')
-        .in('id', uniqueWordIds)
-        .order('sequence_order')
-
-      if (wordError) throw wordError
-
-      const allWords = wordData || []
-      console.log('가져온 전체 단어 수:', allWords.length)
-      setTotalWords(allWords.length)
-
-      // 랜덤 추출: known은 30%, unknown은 70%
-      const percentage = type === 'known' ? 0.3 : 0.7
-      const targetCount = Math.ceil(allWords.length * percentage)
-      
-      console.log(`${type === 'known' ? '30%' : '70%'} 추출:`, targetCount, '개')
-
-      // Fisher-Yates Shuffle로 랜덤화 후 필요한 개수만 추출
-      const shuffled = shuffleArray(allWords)
-      const selectedWords = shuffled.slice(0, targetCount)
-
-      console.log('최종 선택된 단어:', selectedWords.length, '개')
-      setWords(selectedWords)
-    } catch (error) {
-      console.error('단어 로드 실패:', error)
-      setWords([])
-      setTotalWords(0)
-    } finally {
-      setLoading(false)
-    }
   }
 
   return (

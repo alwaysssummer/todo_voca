@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import {
   Dialog,
@@ -101,26 +101,7 @@ export function StudentManagementDialog({
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
-  useEffect(() => {
-    if (open && studentId) {
-      loadAllData()
-    }
-  }, [open, studentId])
-
-  const loadAllData = async () => {
-    setLoading(true)
-    setPendingChanges(new Map())
-    try {
-      await Promise.all([
-        loadStudentInfo(),
-        loadWordlistsWithAssignments(),
-      ])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadStudentInfo = async () => {
+  const loadStudentInfo = useCallback(async () => {
     const { data } = await supabase
       .from('users')
       .select('daily_goal')
@@ -131,7 +112,27 @@ export function StudentManagementDialog({
       const userData = data as { daily_goal: number | null }
       setDailyGoal(userData.daily_goal || 20)
     }
-  }
+  }, [studentId])
+
+  const loadAllData = useCallback(async () => {
+    setLoading(true)
+    setPendingChanges(new Map())
+    try {
+      await Promise.all([
+        loadStudentInfo(),
+        loadWordlistsWithAssignments(),
+      ])
+    } finally {
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadStudentInfo])
+
+  useEffect(() => {
+    if (open && studentId) {
+      loadAllData()
+    }
+  }, [open, studentId, loadAllData])
 
   const loadWordlistsWithAssignments = async () => {
     // 1-1. 원본 단어장 조회 (is_review가 null 또는 false)
