@@ -679,6 +679,7 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
           nextGenerationCreated={generationModalData.nextGenerationCreated}
           perfectCompletion={generationModalData.perfectCompletion}
           studentToken={token}
+          assignmentId={assignmentId}
         />
       )}
 

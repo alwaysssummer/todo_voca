@@ -16,6 +16,7 @@ interface GenerationCompleteModalProps {
   nextGenerationCreated: boolean  // 복습 단어장 생성 여부
   perfectCompletion: boolean  // 학습 완료 여부
   studentToken?: string  // 대시보드 이동을 위한 토큰
+  assignmentId?: string  // 해당 단어장 탭 선택을 위한 ID
 }
 
 interface ConfettiItem {
@@ -34,7 +35,8 @@ export function GenerationCompleteModal({
   skippedCount,
   nextGenerationCreated,
   perfectCompletion,
-  studentToken
+  studentToken,
+  assignmentId
 }: GenerationCompleteModalProps) {
   const [confetti, setConfetti] = useState<ConfettiItem[]>([])
   const [countedWords, setCountedWords] = useState(0)
@@ -93,9 +95,11 @@ export function GenerationCompleteModal({
       // sessionStorage 또는 URL 경로로 모바일 모드 판단
       const isMobile = sessionStorage.getItem('dashboardMode') === 'mobile' ||
                        window.location.pathname.includes('/mobile/')
-      const dashboardPath = isMobile 
-        ? `/s/${studentToken}/mobile/dashboard`
-        : `/s/${studentToken}/dashboard`
+      // assignmentId가 있으면 URL 파라미터로 전달하여 해당 탭 선택
+      const assignmentParam = assignmentId ? `?assignment=${assignmentId}` : ''
+      const dashboardPath = isMobile
+        ? `/s/${studentToken}/mobile/dashboard${assignmentParam}`
+        : `/s/${studentToken}/dashboard${assignmentParam}`
       window.location.href = dashboardPath
     } else {
       window.location.reload()  // Fallback
