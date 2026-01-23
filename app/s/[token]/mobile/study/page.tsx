@@ -13,5 +13,5 @@ export default async function MobileStudyPage({ params, searchParams }: MobileSt
   const { token } = await params
   const { assignment: assignmentId } = await searchParams
 
-  return <StudyScreen token={token} assignmentId={assignmentId} />
+  return <StudyScreen key={assignmentId || 'default'} token={token} assignmentId={assignmentId} />
 }
