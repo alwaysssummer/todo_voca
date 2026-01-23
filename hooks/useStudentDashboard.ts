@@ -12,7 +12,7 @@ export function useStudentDashboard(token: string) {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        // 1. 학생 정보
+        // 1. 학생 정보 먼저 조회 (다른 쿼리에서 student.id 필요)
         const { data: student, error: studentError } = await supabase
           .from('users')
           .select('id, name, daily_goal')
@@ -23,29 +23,71 @@ export function useStudentDashboard(token: string) {
         if (studentError) throw studentError
         if (!student) throw new Error('학생을 찾을 수 없습니다')
 
-        // 2. 모든 배정된 단어장 조회 (여러 개)
-        const { data: assignmentsRaw, error: assignmentError } = await supabase
-          .from('student_wordlists')
-          .select(`
-            id,
-            generation,
-            wordlist_id,
-            filtered_word_ids,
-            base_wordlist_id,
-            is_auto_generated,
-            wordlists!wordlist_id (
-              name,
-              total_words
-            )
-          `)
-          .eq('student_id', student.id)
-          .order('assigned_at', { ascending: true })
-          .returns<StudentWordlistWithWordlist[]>()
+        // 2. 배정된 단어장 + 완성된 회차 병렬 조회 (둘 다 student.id만 필요)
+        type CompletedSessionRow = {
+          id: string
+          session_number: number
+          generation: number
+          assignment_id: string
+          word_ids: number[]
+          unknown_word_ids: number[] | null
+          completed_date: string
+          online_test_completed: boolean
+          online_tests: OnlineTest[] | null
+        }
+
+        const [assignmentsResult, completedSessionsResult] = await Promise.all([
+          // 배정된 단어장 조회
+          supabase
+            .from('student_wordlists')
+            .select(`
+              id,
+              generation,
+              wordlist_id,
+              filtered_word_ids,
+              base_wordlist_id,
+              is_auto_generated,
+              wordlists!wordlist_id (
+                name,
+                total_words
+              )
+            `)
+            .eq('student_id', student.id)
+            .order('assigned_at', { ascending: true })
+            .returns<StudentWordlistWithWordlist[]>(),
+          // 완성된 회차 목록 조회
+          supabase
+            .from('completed_wordlists')
+            .select(`
+              id,
+              session_number,
+              generation,
+              assignment_id,
+              word_ids,
+              unknown_word_ids,
+              completed_date,
+              online_test_completed,
+              online_tests (
+                test_type,
+                correct_count,
+                total_questions,
+                score,
+                wrong_word_ids
+              )
+            `)
+            .eq('student_id', student.id)
+            .order('session_number', { ascending: false })
+            .returns<CompletedSessionRow[]>()
+        ])
+
+        const { data: assignmentsRaw, error: assignmentError } = assignmentsResult
+        const { data: completedSessions, error: sessionsError } = completedSessionsResult
 
         if (assignmentError) throw assignmentError
         if (!assignmentsRaw || assignmentsRaw.length === 0) {
           throw new Error('배정된 단어장이 없습니다')
         }
+        if (sessionsError) throw sessionsError
 
         // 3. 각 단어장별 완료 단어 수 계산
         const assignments: AssignmentData[] = await Promise.all(
@@ -105,44 +147,7 @@ export function useStudentDashboard(token: string) {
           return 0
         })
 
-        // 4. 완성된 회차 목록 (모든 세대)
-        type CompletedSessionRow = {
-          id: string
-          session_number: number
-          generation: number
-          assignment_id: string
-          word_ids: number[]
-          unknown_word_ids: number[] | null
-          completed_date: string
-          online_test_completed: boolean
-          online_tests: OnlineTest[] | null
-        }
-        const { data: completedSessions, error: sessionsError } = await supabase
-          .from('completed_wordlists')
-          .select(`
-            id,
-            session_number,
-            generation,
-            assignment_id,
-            word_ids,
-            unknown_word_ids,
-            completed_date,
-            online_test_completed,
-            online_tests (
-              test_type,
-              correct_count,
-              total_questions,
-              score,
-              wrong_word_ids
-            )
-          `)
-          .eq('student_id', student.id)
-          .order('session_number', { ascending: false })
-          .returns<CompletedSessionRow[]>()
-
-        if (sessionsError) throw sessionsError
-
-        // 완성된 회차 데이터 변환
+        // 4. 완성된 회차 데이터 변환 (이미 위에서 병렬 조회됨)
         const formattedSessions = (completedSessions || []).map(session => {
           const tests = session.online_tests as OnlineTest[] | null
           const oTest = tests?.find((t) => t.test_type === 'known')

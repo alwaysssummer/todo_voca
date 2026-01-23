@@ -3,17 +3,28 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // 프로덕션 빌드 최적화
   compiler: {
-    // 디버깅을 위해 일시적으로 console.log 제거 비활성화
-    removeConsole: false
+    // 프로덕션에서만 console.log 제거
+    removeConsole: process.env.NODE_ENV === 'production'
   },
-  
+
   // 성능 최적화
   poweredByHeader: false, // X-Powered-By 헤더 제거
-  
-  // 캐시 제어 헤더 추가 (자동 로그인 디버깅용)
+
+  // 캐시 제어 헤더 추가
   async headers() {
     return [
       {
+        // 정적 자산 (JS, CSS, 이미지) - 1년 캐시
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // HTML 페이지 - 재검증 필요
         source: '/:path*',
         headers: [
           {

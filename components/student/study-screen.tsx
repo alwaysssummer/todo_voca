@@ -1,17 +1,28 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStudySession } from '@/hooks/useStudySession'
 import { useTTS } from '@/hooks/useTTS'
-import { SkipModalMinimal } from './skip-modal-minimal'
-import { SkipModalMedium } from './skip-modal-medium'
-import { GoalAchievedModal } from './goal-achieved-modal'
-import { GenerationCompleteModal } from './generation-complete-modal'
 import { Loader2, Volume2 } from 'lucide-react'
+
+// 모달 컴포넌트 동적 임포트 (초기 번들 크기 감소)
+const SkipModalMinimal = dynamic(() =>
+  import('./skip-modal-minimal').then(mod => ({ default: mod.SkipModalMinimal }))
+)
+const SkipModalMedium = dynamic(() =>
+  import('./skip-modal-medium').then(mod => ({ default: mod.SkipModalMedium }))
+)
+const GoalAchievedModal = dynamic(() =>
+  import('./goal-achieved-modal').then(mod => ({ default: mod.GoalAchievedModal }))
+)
+const GenerationCompleteModal = dynamic(() =>
+  import('./generation-complete-modal').then(mod => ({ default: mod.GenerationCompleteModal }))
+)
 import type { Word } from '@/types/word'
 
 interface StudyScreenProps {
@@ -176,7 +187,7 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   }
 
   // 🆕 Phase 1-3: 일시정지/재개 토글 함수 (Phase 2-1: 개선)
-  const togglePause = () => {
+  const togglePause = useCallback(() => {
     // 🔒 Phase 2-1: 화면 상태 체크
     if (!showDontKnowScreen) {
       console.log('⚠️ [togglePause] 강조 화면이 아닙니다. 무시합니다.')
@@ -254,7 +265,7 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
         await fetchNextWord()
       }, remainingTimeRef.current)
     }
-  }
+  }, [showDontKnowScreen, isProcessing, clickCooldown, isPaused, dontKnowCountdown, fetchNextWord])
 
   const onDontKnowClick = async () => {
     if (!currentWord) return
@@ -504,8 +515,16 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
     )
   }
 
-  const progressPercentage = (progress.today / progress.todayGoal) * 100
-  const generationProgressPercentage = (progress.generationCompleted / progress.generationTotal) * 100
+  // 진행률 계산 메모화
+  const progressPercentage = useMemo(() => {
+    if (!progress || progress.todayGoal === 0) return 0
+    return Math.round((progress.today / progress.todayGoal) * 100)
+  }, [progress])
+
+  const generationProgressPercentage = useMemo(() => {
+    if (!progress || progress.generationTotal === 0) return 0
+    return Math.round((progress.generationCompleted / progress.generationTotal) * 100)
+  }, [progress])
 
   const meaningLength = currentWord?.meaning?.length ?? 0
   const meaningFontClass = (() => {

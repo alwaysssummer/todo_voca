@@ -144,6 +144,8 @@ export function useStudySession(token: string, assignmentId?: string | null) {
   const [showGenerationCompleteModal, setShowGenerationCompleteModal] = useState(false)  // ⭐ 단어장 완료 모달
   const [generationModalData, setGenerationModalData] = useState<GenerationModalData | null>(null)  // ⭐ 단어장 완료 모달 데이터
   const isGeneratingReviewRef = useRef(false)  // ⭐ useRef로 즉시 중복 방지
+  const targetWordIdsRef = useRef<number[] | null>(null)  // ⭐ targetWordIds 캐싱
+  const targetWordIdsAssignmentIdRef = useRef<string | null>(null)  // ⭐ 캐시된 assignment ID 추적
 
   // 학생 정보 및 현재 활성 assignment 가져오기
   useEffect(() => {
@@ -565,13 +567,23 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     }
   }, [student, currentAssignment])
 
-  // ⭐ 대상 단어 ID 가져오기 (헬퍼 함수)
+  // ⭐ 대상 단어 ID 가져오기 (헬퍼 함수) - 캐싱 적용
   const getTargetWordIds = async (): Promise<number[]> => {
     if (!currentAssignment) return []
 
+    // ⭐ 캐시가 있고, 같은 assignment에 대한 것이면 캐시 반환
+    if (
+      targetWordIdsRef.current !== null &&
+      targetWordIdsAssignmentIdRef.current === currentAssignment.id
+    ) {
+      return targetWordIdsRef.current
+    }
+
+    let result: number[]
+
     // filtered_word_ids가 있으면 사용, 없으면 wordlist의 실제 단어 ID를 가져옴
     if (currentAssignment.filtered_word_ids && currentAssignment.filtered_word_ids.length > 0) {
-      return currentAssignment.filtered_word_ids
+      result = currentAssignment.filtered_word_ids
     } else {
       // 실제 단어 ID를 DB에서 조회
       const { data: words } = await (supabase as any)
@@ -579,8 +591,14 @@ export function useStudySession(token: string, assignmentId?: string | null) {
         .select('id')
         .eq('wordlist_id', currentAssignment.wordlist_id)
 
-      return words?.map((w: any) => w.id) || []
+      result = words?.map((w: any) => w.id) || []
     }
+
+    // ⭐ 캐시에 저장
+    targetWordIdsRef.current = result
+    targetWordIdsAssignmentIdRef.current = currentAssignment.id
+
+    return result
   }
 
   // 단어장 완료 체크 (모든 단어가 "안다"가 되었는지)

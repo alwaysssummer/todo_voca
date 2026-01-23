@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useRouter } from 'next/navigation'
-import { 
-  BookOpen, 
-  Loader2, 
-  AlertCircle, 
+import {
+  BookOpen,
+  Loader2,
+  AlertCircle,
   BarChart3,
   CheckCircle2,
   XCircle,
@@ -21,12 +22,26 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react'
-import { UnknownWordsModal } from '@/components/student/unknown-words-modal'
-import { KnownWordsModal } from '@/components/student/known-words-modal'
-import { ExamPrintModal } from '@/components/student/exam-print-modal'
-import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
-import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
-import { TestResultModal } from '@/components/student/test-result-modal'
+
+// 모달 컴포넌트 동적 임포트 (초기 번들 크기 감소)
+const UnknownWordsModal = dynamic(() =>
+  import('@/components/student/unknown-words-modal').then(mod => ({ default: mod.UnknownWordsModal }))
+)
+const KnownWordsModal = dynamic(() =>
+  import('@/components/student/known-words-modal').then(mod => ({ default: mod.KnownWordsModal }))
+)
+const ExamPrintModal = dynamic(() =>
+  import('@/components/student/exam-print-modal').then(mod => ({ default: mod.ExamPrintModal }))
+)
+const VocabularyPrintModal = dynamic(() =>
+  import('@/components/student/vocabulary-print-modal').then(mod => ({ default: mod.VocabularyPrintModal }))
+)
+const WholeVocabularyPrintModal = dynamic(() =>
+  import('@/components/student/whole-vocabulary-print-modal').then(mod => ({ default: mod.WholeVocabularyPrintModal }))
+)
+const TestResultModal = dynamic(() =>
+  import('@/components/student/test-result-modal').then(mod => ({ default: mod.TestResultModal }))
+)
 
 interface StudentDashboardProps {
   token: string
@@ -87,83 +102,6 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   // 선택된 단어장 index (여러 단어장 지원)
   const [selectedAssignmentIndex, setSelectedAssignmentIndex] = useState(0)
 
-  // 체크박스 토글 함수 (Shift+클릭으로 범위 선택 지원)
-  const toggleSessionSelection = (sessionId: string, index: number, event: React.MouseEvent) => {
-    const isShiftPressed = event.shiftKey
-
-    if (isShiftPressed && lastClickedIndex !== null) {
-      // Shift+클릭: 범위 선택 (마지막 클릭 위치부터 현재까지)
-      const start = Math.min(lastClickedIndex, index)
-      const end = Math.max(lastClickedIndex, index)
-      const rangeIds = sessions.slice(start, end + 1).map(s => s.id)
-
-      setSelectedSessionsForExam(prev => {
-        const newSet = new Set(prev)
-        rangeIds.forEach(id => newSet.add(id))
-        return Array.from(newSet)
-      })
-      setLastClickedIndex(index)
-    } else {
-      // 일반 클릭 또는 Ctrl+클릭: 토글 (현재 동작 유지)
-      setSelectedSessionsForExam(prev =>
-        prev.includes(sessionId)
-          ? prev.filter(id => id !== sessionId)
-          : [...prev, sessionId]
-      )
-      setLastClickedIndex(index)
-    }
-  }
-
-  // 시험지 출력 핸들러
-  const handleExamPrint = (type: 'known' | 'unknown') => {
-    console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
-    console.log('선택된 회차:', selectedSessionsForExam)
-    
-    const title = type === 'known' 
-      ? `아는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
-      : `모르는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
-    
-    setExamModalType(type)
-    setExamModalTitle(title)
-    setExamModalOpen(true)
-  }
-
-  // 단어장 출력 핸들러
-  const handleVocabularyPrint = (type: 'known' | 'unknown') => {
-    console.log(`${type === 'known' ? '아는' : '모르는'} 단어장 출력`)
-    console.log('선택된 회차:', selectedSessionsForExam)
-    
-    const title = type === 'known'
-      ? `아는 단어장 (${selectedSessionsForExam.length}개 회차)`
-      : `모르는 단어장 (${selectedSessionsForExam.length}개 회차)`
-    
-    setVocabModalType(type)
-    setVocabModalTitle(title)
-    setVocabModalOpen(true)
-  }
-
-  // 전체 단어장 출력 핸들러
-  const handleWholeVocabularyPrint = () => {
-    console.log('전체 단어장 출력')
-    console.log('selectedAssignment:', selectedAssignment)
-    console.log('wordlist_id:', selectedAssignment?.wordlist_id)
-    setWholeVocabModalOpen(true)
-  }
-
-  // 테스트 결과 보기 핸들러
-  const handleViewTestResult = (
-    sessionNumber: number,
-    testType: 'known' | 'unknown',
-    wrongWordIds: number[] | null
-  ) => {
-    setTestResultModalData({
-      sessionNumber,
-      testType,
-      wrongWordIds
-    })
-    setTestResultModalOpen(true)
-  }
-
   // 선택된 단어장 (data가 있을 때만 유효)
   const assignments = useMemo(() => data?.assignments ?? [], [data?.assignments])
   const currentAssignment = data?.currentAssignment ?? null
@@ -211,6 +149,83 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
       return a.session_number - b.session_number
     })
   }, [filteredCompletedSessions])
+
+  // 체크박스 토글 함수 (Shift+클릭으로 범위 선택 지원) - useCallback 메모화
+  const toggleSessionSelection = useCallback((sessionId: string, index: number, event: React.MouseEvent) => {
+    const isShiftPressed = event.shiftKey
+
+    if (isShiftPressed && lastClickedIndex !== null) {
+      // Shift+클릭: 범위 선택 (마지막 클릭 위치부터 현재까지)
+      const start = Math.min(lastClickedIndex, index)
+      const end = Math.max(lastClickedIndex, index)
+      const rangeIds = sessions.slice(start, end + 1).map(s => s.id)
+
+      setSelectedSessionsForExam(prev => {
+        const newSet = new Set(prev)
+        rangeIds.forEach(id => newSet.add(id))
+        return Array.from(newSet)
+      })
+      setLastClickedIndex(index)
+    } else {
+      // 일반 클릭 또는 Ctrl+클릭: 토글 (현재 동작 유지)
+      setSelectedSessionsForExam(prev =>
+        prev.includes(sessionId)
+          ? prev.filter(id => id !== sessionId)
+          : [...prev, sessionId]
+      )
+      setLastClickedIndex(index)
+    }
+  }, [sessions, lastClickedIndex])
+
+  // 시험지 출력 핸들러 - useCallback 메모화
+  const handleExamPrint = useCallback((type: 'known' | 'unknown') => {
+    console.log(`${type === 'known' ? '아는' : '모르는'} 단어 시험지 출력`)
+    console.log('선택된 회차:', selectedSessionsForExam)
+
+    const title = type === 'known'
+      ? `아는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
+      : `모르는 단어 시험지 (${selectedSessionsForExam.length}개 회차)`
+
+    setExamModalType(type)
+    setExamModalTitle(title)
+    setExamModalOpen(true)
+  }, [selectedSessionsForExam])
+
+  // 단어장 출력 핸들러 - useCallback 메모화
+  const handleVocabularyPrint = useCallback((type: 'known' | 'unknown') => {
+    console.log(`${type === 'known' ? '아는' : '모르는'} 단어장 출력`)
+    console.log('선택된 회차:', selectedSessionsForExam)
+
+    const title = type === 'known'
+      ? `아는 단어장 (${selectedSessionsForExam.length}개 회차)`
+      : `모르는 단어장 (${selectedSessionsForExam.length}개 회차)`
+
+    setVocabModalType(type)
+    setVocabModalTitle(title)
+    setVocabModalOpen(true)
+  }, [selectedSessionsForExam])
+
+  // 전체 단어장 출력 핸들러
+  const handleWholeVocabularyPrint = () => {
+    console.log('전체 단어장 출력')
+    console.log('selectedAssignment:', selectedAssignment)
+    console.log('wordlist_id:', selectedAssignment?.wordlist_id)
+    setWholeVocabModalOpen(true)
+  }
+
+  // 테스트 결과 보기 핸들러
+  const handleViewTestResult = (
+    sessionNumber: number,
+    testType: 'known' | 'unknown',
+    wrongWordIds: number[] | null
+  ) => {
+    setTestResultModalData({
+      sessionNumber,
+      testType,
+      wrongWordIds
+    })
+    setTestResultModalOpen(true)
+  }
 
   // === 조기 반환 (모든 Hook 후에) ===
   if (loading) {
@@ -267,73 +282,69 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   const { student } = data
 
-  // 날짜별로 세션 그룹핑
-  const getSessionsByDate = () => {
+  // 날짜별로 세션 그룹핑 - useMemo 메모화
+  const sessionsByDate = useMemo(() => {
     type Session = typeof sessions[number]
-    const sessionsByDate: Record<string, Session[]> = {}
-    
+    const result: Record<string, Session[]> = {}
+
     sessions.forEach(session => {
       const date = new Date(session.completed_date)
       const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-      
-      if (!sessionsByDate[dateKey]) {
-        sessionsByDate[dateKey] = []
+
+      if (!result[dateKey]) {
+        result[dateKey] = []
       }
-      sessionsByDate[dateKey].push(session)
+      result[dateKey].push(session)
     })
-    
-    return sessionsByDate
-  }
-  
-  // 주간 날짜 배열 생성 (월~일)
-  const getWeekDays = () => {
+
+    return result
+  }, [sessions])
+
+  // 주간 날짜 배열 생성 (월~일) - useMemo 메모화
+  const weekDays = useMemo(() => {
     const days = []
     const today = new Date()
     const dayOfWeek = today.getDay() // 0(일) ~ 6(토)
     const monday = new Date(today)
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)) // 이번주 월요일
-    
+
     // weekOffset 적용 (이전주/다음주 이동)
     monday.setDate(monday.getDate() + (weekOffset * 7))
-    
+
     for (let i = 0; i < 7; i++) {
       const day = new Date(monday)
       day.setDate(monday.getDate() + i)
       days.push(day)
     }
-    
+
     return days
-  }
-  
-  // 월간 달력 배열 생성
-  const getMonthCalendar = () => {
+  }, [weekOffset])
+
+  // 월간 달력 배열 생성 - useMemo 메모화
+  const monthCalendar = useMemo(() => {
     const today = new Date()
     const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
     const year = targetDate.getFullYear()
     const month = targetDate.getMonth()
-    
+
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     const firstDayOfWeek = firstDay.getDay() // 0(일) ~ 6(토)
-    
-    const calendar = []
-    
+
+    const calendar: (Date | null)[] = []
+
     // 빈칸 추가 (이전 달)
     for (let i = 0; i < firstDayOfWeek; i++) {
       calendar.push(null)
     }
-    
+
     // 날짜 추가
     for (let date = 1; date <= lastDay.getDate(); date++) {
       calendar.push(new Date(year, month, date))
     }
-    
+
     return { calendar, year, month: month + 1 }
-  }
-  
-  const sessionsByDate = getSessionsByDate()
-  const weekDays = getWeekDays()
-  const monthCalendar = getMonthCalendar()
+  }, [monthOffset])
   
   // 전체 선택/해제 토글 (모든 세션 대상)
   const toggleSelectAll = () => {
