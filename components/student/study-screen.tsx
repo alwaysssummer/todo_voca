@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { useStudySession } from '@/hooks/useStudySession'
 import { useTTS } from '@/hooks/useTTS'
-import { Loader2, Volume2, BookOpen } from 'lucide-react'
+import { Loader2, Volume2, BookOpen, X } from 'lucide-react'
 
 // 모달 컴포넌트 동적 임포트 (초기 번들 크기 감소)
 const SkipModalMinimal = dynamic(() =>
@@ -45,6 +45,7 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
     handleKnow,
     handleDontKnow,
     confirmSkip,
+    handleRevertToSkipped,
     fetchNextWord,
     showGenerationCompleteModal,
     setShowGenerationCompleteModal,
@@ -695,20 +696,38 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
                     style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="flex justify-between items-center w-full">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                         <span className="text-muted-foreground font-medium min-w-[2ch] text-sm">
                           {completedWords.length - idx}.
                         </span>
-                        <span className="font-semibold text-base">
+                        <span className="font-semibold text-base truncate">
                           {word.word_text}
                         </span>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-muted-foreground truncate">
                           {word.meaning}
                         </span>
                       </div>
-                      {idx === 0 && (
-                        <span className="text-xl animate-bounce">✨</span>
-                      )}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {idx === 0 && (
+                          <span className="text-xl animate-bounce">✨</span>
+                        )}
+                        {/* X 버튼: 복습 대상으로 전환 */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            try {
+                              await handleRevertToSkipped(word.id)
+                            } catch (err) {
+                              console.error('복습 전환 실패:', err)
+                              alert('오류가 발생했습니다')
+                            }
+                          }}
+                          className="p-1.5 hover:bg-red-100 rounded-full transition-colors text-gray-400 hover:text-red-500"
+                          title="복습 대상으로 전환"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </Card>
                 ))

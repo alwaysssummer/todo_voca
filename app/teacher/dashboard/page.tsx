@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  Users, 
-  BookOpen, 
-  TrendingUp, 
+import {
+  Users,
+  BookOpen,
+  TrendingUp,
   LogOut,
   Plus,
   Eye,
@@ -21,7 +21,11 @@ import {
   X,
   Merge,
   GripVertical,
-  Printer
+  Printer,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Smartphone
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import type { User, Wordlist as WordlistDB, StudentWordlist } from '@/types/database'
@@ -32,6 +36,22 @@ import { MergeWordlistDialog } from '@/components/teacher/merge-wordlist-dialog'
 import { StudentManagementDialog } from '@/components/teacher/student-management-dialog'
 import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary-print-modal'
 import { Input } from '@/components/ui/input'
+import { Progress } from '@/components/ui/progress'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   DndContext,
   closestCenter,
@@ -68,6 +88,7 @@ interface Student {
   xTestCompleted: number       // X-TEST 완료 회차
   accessToken: string | null
   displayOrder: number         // 표시 순서
+  lastActivityAt: string | null // 최근 활동 시간
 }
 
 interface Wordlist {
@@ -167,6 +188,12 @@ export default function TeacherDashboard() {
   const [viewWordlistOpen, setViewWordlistOpen] = useState(false)
   const [selectedWordlist, setSelectedWordlist] = useState<Wordlist | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // 정렬/필터 상태
+  const [sortField, setSortField] = useState<'name' | 'progress' | 'lastActivity'>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [progressFilter, setProgressFilter] = useState<'all' | 'warning' | 'inProgress' | 'good'>('all')
+
   const [editingWordlistId, setEditingWordlistId] = useState<string | null>(null)
   const [editingWordlistName, setEditingWordlistName] = useState('')
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null)
@@ -275,6 +302,35 @@ export default function TeacherDashboard() {
 
           const progress = totalWords ? Math.round((completedCount || 0) / totalWords * 100) : 0
 
+          // 6. 최근 활동 시간 조회
+          const { data: lastProgress } = await supabase
+            .from('student_word_progress')
+            .select('updated_at')
+            .eq('student_id', student.id)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single<{ updated_at: string }>()
+
+          const { data: lastCompleted } = await supabase
+            .from('completed_wordlists')
+            .select('created_at')
+            .eq('student_id', student.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single<{ created_at: string }>()
+
+          // 둘 중 최신 날짜 선택
+          let lastActivityAt: string | null = null
+          if (lastProgress?.updated_at && lastCompleted?.created_at) {
+            const progressDate = new Date(lastProgress.updated_at)
+            const completedDate = new Date(lastCompleted.created_at)
+            lastActivityAt = progressDate > completedDate ? lastProgress.updated_at : lastCompleted.created_at
+          } else if (lastProgress?.updated_at) {
+            lastActivityAt = lastProgress.updated_at
+          } else if (lastCompleted?.created_at) {
+            lastActivityAt = lastCompleted.created_at
+          }
+
           return {
             id: student.id,
             name: student.name,
@@ -285,7 +341,8 @@ export default function TeacherDashboard() {
             oTestCompleted: oTestCompleted || 0,
             xTestCompleted: xTestCompleted,
             accessToken: student.access_token,
-            displayOrder: student.display_order || 0
+            displayOrder: student.display_order || 0,
+            lastActivityAt: lastActivityAt
           }
         })
       )
@@ -731,8 +788,82 @@ export default function TeacherDashboard() {
     }
   }
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // 유틸리티 함수: 상대적 시간 표시
+  const formatRelativeTime = (dateString: string | null): string => {
+    if (!dateString) return '활동 없음'
+
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return '오늘'
+    if (diffDays === 1) return '어제'
+    if (diffDays <= 3) return `${diffDays}일 전`
+    if (diffDays <= 7) return '1주 전'
+    if (diffDays <= 14) return '2주 전'
+    if (diffDays <= 30) return '1개월 전'
+    return '1개월 이상'
+  }
+
+  // 유틸리티 함수: 진행 상태 판별
+  const getProgressStatus = (progress: number): 'warning' | 'inProgress' | 'good' => {
+    if (progress < 30) return 'warning'
+    if (progress < 70) return 'inProgress'
+    return 'good'
+  }
+
+  // 유틸리티 함수: 진행률별 색상
+  const getProgressColorClass = (progress: number): string => {
+    if (progress < 30) return 'bg-red-500'
+    if (progress < 70) return 'bg-yellow-500'
+    return 'bg-green-500'
+  }
+
+  // 정렬 함수
+  const sortStudents = (studentsToSort: Student[]): Student[] => {
+    return [...studentsToSort].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'ko')
+          break
+        case 'progress':
+          comparison = a.progress - b.progress
+          break
+        case 'lastActivity':
+          const dateA = a.lastActivityAt ? new Date(a.lastActivityAt).getTime() : 0
+          const dateB = b.lastActivityAt ? new Date(b.lastActivityAt).getTime() : 0
+          comparison = dateA - dateB
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }
+
+  // 정렬 토글 핸들러
+  const handleSortToggle = (field: 'name' | 'progress' | 'lastActivity') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // 필터링 + 정렬 적용
+  const filteredStudents = sortStudents(
+    students.filter(student => {
+      // 검색 필터
+      const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase())
+
+      // 진행 상태 필터
+      const matchesProgress = progressFilter === 'all' || getProgressStatus(student.progress) === progressFilter
+
+      return matchesSearch && matchesProgress
+    })
   )
 
   // 드래그 앤 드롭 센서 설정
@@ -933,7 +1064,7 @@ export default function TeacherDashboard() {
           </Card>
         </div>
 
-        {/* 학생 목록 */}
+        {/* 학생 목록 - 테이블 뷰 */}
         <Card className="mb-8">
           <CardHeader>
             <div className="flex items-center justify-between mb-4">
@@ -943,16 +1074,31 @@ export default function TeacherDashboard() {
                 학생 추가
               </Button>
             </div>
-            
+
             {students.length > 0 && (
               <>
-                <Input
-                  placeholder="학생 이름으로 검색..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="max-w-sm mb-3"
-                />
-                
+                <div className="flex items-center gap-4 mb-3">
+                  <Input
+                    placeholder="학생 이름으로 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="max-w-xs"
+                  />
+
+                  {/* 진행 상태 필터 */}
+                  <Select value={progressFilter} onValueChange={(value) => setProgressFilter(value as 'all' | 'warning' | 'inProgress' | 'good')}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="진행 상태" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">전체</SelectItem>
+                      <SelectItem value="warning">주의 필요 (0-30%)</SelectItem>
+                      <SelectItem value="inProgress">진행 중 (30-70%)</SelectItem>
+                      <SelectItem value="good">양호 (70%+)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* 전체 선택 + 선택 삭제 버튼 */}
                 <div className="flex items-center justify-between gap-2 pb-3 border-b">
                   <div className="flex items-center gap-2">
@@ -969,7 +1115,7 @@ export default function TeacherDashboard() {
                       )}
                     </span>
                   </div>
-                  
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -994,139 +1140,192 @@ export default function TeacherDashboard() {
                 검색 결과가 없습니다
               </div>
             ) : (
-              <DndContext
-                sensors={studentSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleStudentDragEnd}
-              >
-                <SortableContext
-                  items={filteredStudents.map(s => s.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-2">
-                    {filteredStudents.map((student) => (
-                      <SortableStudentItem key={student.id} student={student}>
-                        <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors flex-1">
-                          {/* 좌측: 학생 기본 정보 */}
-                          <div className="flex items-center gap-3">
-                            {/* 체크박스 */}
-                            <Checkbox
-                              checked={selectedStudents.includes(student.id)}
-                              onCheckedChange={() => toggleStudentSelection(student.id)}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => handleSortToggle('name')}
+                    >
+                      <div className="flex items-center gap-2">
+                        이름
+                        {sortField === 'name' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => handleSortToggle('progress')}
+                    >
+                      <div className="flex items-center gap-2">
+                        진행률
+                        {sortField === 'progress' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead>회차</TableHead>
+                    <TableHead>O-TEST</TableHead>
+                    <TableHead>X-TEST</TableHead>
+                    <TableHead
+                      className="cursor-pointer hover:bg-accent/50 transition-colors"
+                      onClick={() => handleSortToggle('lastActivity')}
+                    >
+                      <div className="flex items-center gap-2">
+                        최근활동
+                        {sortField === 'lastActivity' ? (
+                          sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                        ) : (
+                          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-right">액션</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      {/* 체크박스 */}
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedStudents.includes(student.id)}
+                          onCheckedChange={() => toggleStudentSelection(student.id)}
+                        />
+                      </TableCell>
+
+                      {/* 이름 */}
+                      <TableCell>
+                        {editingStudentId === student.id ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={editingStudentName}
+                              onChange={(e) => setEditingStudentName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveStudentName()
+                                else if (e.key === 'Escape') handleCancelStudentEdit()
+                              }}
+                              className="h-8 w-32"
+                              autoFocus
+                              onBlur={handleSaveStudentName}
                             />
-                            
-                            {/* 학생 이름 - 편집 모드 */}
-                            {editingStudentId === student.id ? (
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  value={editingStudentName}
-                                  onChange={(e) => setEditingStudentName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      handleSaveStudentName()
-                                    } else if (e.key === 'Escape') {
-                                      handleCancelStudentEdit()
-                                    }
-                                  }}
-                                  className="h-8 w-48"
-                                  autoFocus
-                                  onBlur={handleSaveStudentName}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  onClick={handleSaveStudentName}
-                                >
-                                  <Check className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0 text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-                                  onClick={handleCancelStudentEdit}
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group">
-                                <h3
-                                  className="font-semibold cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                                  onClick={() => {
-                                    setSelectedStudentForManagement(student)
-                                    setStudentManagementOpen(true)
-                                  }}
-                                  title="학생 관리"
-                                >
-                                  {student.name}
-                                </h3>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => handleEditStudentName(student.id, student.name)}
-                                  title="이름 변경"
-                                >
-                                  <Edit2 className="w-3 h-3 text-muted-foreground" />
-                                </Button>
-                              </div>
-                            )}
-                            <span className="text-sm text-muted-foreground">{student.email}</span>
                           </div>
-
-                          {/* 우측: 진행 상황 + 버튼 */}
-                          <div className="flex items-center gap-3">
-                            {/* 학습 진행 통계 */}
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="gap-1">
-                                <BookOpen className="w-3 h-3" />
-                                {student.completedSessions}/{student.totalSessions}
-                              </Badge>
-                              
-                              <span className="text-sm font-medium">{student.progress}%</span>
-                            </div>
-
-                            {/* 액션 버튼 */}
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => student.accessToken && openStudentDashboard(student.accessToken)}
-                                className="gap-2"
-                                disabled={!student.accessToken}
-                              >
-                                <Eye className="w-3 h-3" />
-                                D
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
-                                  window.open(link, '_blank')
-                                }}
-                                className="gap-2"
-                              >
-                                <Eye className="w-3 h-3" />
-                                M
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteStudent(student.id, student.name)}
-                                className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
+                        ) : (
+                          <div className="flex items-center gap-2 group">
+                            <span
+                              className="font-semibold cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={() => {
+                                setSelectedStudentForManagement(student)
+                                setStudentManagementOpen(true)
+                              }}
+                            >
+                              {student.name}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                              onClick={() => handleEditStudentName(student.id, student.name)}
+                            >
+                              <Edit2 className="w-3 h-3 text-muted-foreground" />
+                            </Button>
                           </div>
+                        )}
+                      </TableCell>
+
+                      {/* 진행률 */}
+                      <TableCell>
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${getProgressColorClass(student.progress)}`}
+                              style={{ width: `${student.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium w-12 text-right">{student.progress}%</span>
                         </div>
-                      </SortableStudentItem>
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+                      </TableCell>
+
+                      {/* 회차 */}
+                      <TableCell>
+                        <Badge variant="outline" className="gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          {student.completedSessions}/{student.totalSessions}
+                        </Badge>
+                      </TableCell>
+
+                      {/* O-TEST */}
+                      <TableCell>
+                        <Badge variant="secondary" className="gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-green-600" />
+                          {student.oTestCompleted}
+                        </Badge>
+                      </TableCell>
+
+                      {/* X-TEST */}
+                      <TableCell>
+                        <Badge variant="secondary" className="gap-1">
+                          <XCircle className="w-3 h-3 text-red-600" />
+                          {student.xTestCompleted}
+                        </Badge>
+                      </TableCell>
+
+                      {/* 최근 활동 */}
+                      <TableCell>
+                        <span className={`text-sm ${
+                          !student.lastActivityAt ? 'text-muted-foreground' :
+                          formatRelativeTime(student.lastActivityAt) === '오늘' ? 'text-green-600 font-medium' :
+                          formatRelativeTime(student.lastActivityAt).includes('주') ? 'text-orange-600' :
+                          ''
+                        }`}>
+                          {formatRelativeTime(student.lastActivityAt)}
+                        </span>
+                      </TableCell>
+
+                      {/* 액션 */}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => student.accessToken && openStudentDashboard(student.accessToken)}
+                            disabled={!student.accessToken}
+                            title="데스크톱 대시보드"
+                          >
+                            <Eye className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const link = `${window.location.origin}/s/${student.accessToken}/mobile/dashboard`
+                              window.open(link, '_blank')
+                            }}
+                            title="모바일 대시보드"
+                          >
+                            <Smartphone className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteStudent(student.id, student.name)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="학생 삭제"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>

@@ -1329,6 +1329,39 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     await fetchNextWord()
   }
 
+  // ⭐ "안다" 완료 단어를 "모른다"로 전환 (복습 대상으로 변경)
+  const handleRevertToSkipped = async (wordId: number) => {
+    if (!student || !currentAssignment || !currentWordlist) return
+
+    try {
+      console.log('🔄 [handleRevertToSkipped] 단어 복습 전환:', wordId)
+
+      // 1. DB 상태 변경: completed → skipped
+      const { error } = await (supabase as any)
+        .from('student_word_progress')
+        .update({
+          status: 'skipped',
+          last_skipped_session: currentAssignment.current_session,
+          updated_at: new Date().toISOString()
+        })
+        .eq('student_id', student.id)
+        .eq('word_id', wordId)
+
+      if (error) throw error
+
+      // 2. UI 완료 목록에서 제거
+      setCompletedWords(prev => prev.filter(w => w.id !== wordId))
+
+      // 3. 진행률 업데이트
+      await updateProgress(student.id, currentAssignment, currentWordlist)
+
+      console.log('✅ [handleRevertToSkipped] 복습 전환 완료')
+    } catch (err) {
+      console.error('❌ [handleRevertToSkipped] 실패:', err)
+      throw err
+    }
+  }
+
   return {
     student,
     currentAssignment,
@@ -1342,6 +1375,7 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     handleKnow,
     handleDontKnow,
     confirmSkip,
+    handleRevertToSkipped,
     fetchNextWord,
     showGenerationCompleteModal,
     setShowGenerationCompleteModal,
