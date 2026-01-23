@@ -53,11 +53,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
   
   // 보기 모드 state (전체/주간/월간)
   const [viewMode, setViewMode] = useState<'all' | 'week' | 'month'>('all')
-  
-  // 주간/월간 이동 offset
-  const [weekOffset, setWeekOffset] = useState(0) // 0 = 이번주, -1 = 이전주, +1 = 다음주
-  const [monthOffset, setMonthOffset] = useState(0) // 0 = 이번달, -1 = 이전달, +1 = 다음달
-  
+
   // 모르는 단어 모달 state
   const [unknownWordsOpen, setUnknownWordsOpen] = useState(false)
   const [selectedSession, setSelectedSession] = useState<{
@@ -101,6 +97,10 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
   // 선택된 단어장 index (여러 단어장 지원)
   const [selectedAssignmentIndex, setSelectedAssignmentIndex] = useState(0)
+
+  // 주간/월간 이동 offset
+  const [weekOffset, setWeekOffset] = useState(0) // 0 = 이번주, -1 = 이전주, +1 = 다음주
+  const [monthOffset, setMonthOffset] = useState(0) // 0 = 이번달, -1 = 이전달, +1 = 다음달
 
   // 선택된 단어장 (data가 있을 때만 유효)
   const assignments = useMemo(() => data?.assignments ?? [], [data?.assignments])
@@ -227,61 +227,6 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     setTestResultModalOpen(true)
   }
 
-  // === 조기 반환 (모든 Hook 후에) ===
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-muted-foreground">로딩 중...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-destructive">오류 발생</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {error?.message || '알 수 없는 오류가 발생했습니다'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // 선택된 단어장이 없으면 에러 표시
-  if (!selectedAssignment) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              <CardTitle className="text-destructive">단어장 없음</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              배정된 단어장이 없습니다. 선생님에게 문의해주세요.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  const { student } = data
-
   // 날짜별로 세션 그룹핑 - useMemo 메모화
   const sessionsByDate = useMemo(() => {
     type Session = typeof sessions[number]
@@ -345,7 +290,62 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
 
     return { calendar, year, month: month + 1 }
   }, [monthOffset])
-  
+
+  // === 조기 반환 (모든 Hook 후에) ===
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-destructive">오류 발생</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {error?.message || '알 수 없는 오류가 발생했습니다'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // 선택된 단어장이 없으면 에러 표시
+  if (!selectedAssignment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <CardTitle className="text-destructive">단어장 없음</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              배정된 단어장이 없습니다. 선생님에게 문의해주세요.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const { student } = data
+
   // 전체 선택/해제 토글 (모든 세션 대상)
   const toggleSelectAll = () => {
     if (selectedSessionsForExam.length === sessions.length) {
