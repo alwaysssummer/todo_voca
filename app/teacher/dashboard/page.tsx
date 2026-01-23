@@ -846,147 +846,82 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
-      {/* 헤더 */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
+    <div className="min-h-screen bg-gray-50">
+      {/* 초미니멀 헤더 */}
+      <header className="bg-white border-b shadow-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="flex items-center gap-4">
+            {/* 로고 */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-purple-600 to-blue-600 rounded flex items-center justify-center">
+                <BookOpen className="w-4 h-4 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  Todo Voca
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {teacherName} 선생님
-                </p>
-              </div>
+              <span className="font-bold text-lg bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                Todo Voca
+              </span>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="gap-2"
+
+            {/* 검색 */}
+            <Input
+              placeholder="검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-40 h-8 text-sm"
+            />
+
+            {/* 전체 선택 */}
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                onCheckedChange={toggleSelectAllStudents}
+                className="h-4 w-4"
+              />
+              <span className="text-xs text-muted-foreground">
+                전체
+                {selectedStudents.length > 0 && (
+                  <span className="ml-1 text-blue-600 font-semibold">
+                    ({selectedStudents.length})
+                  </span>
+                )}
+              </span>
+            </div>
+
+            {/* 선택 삭제 */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={selectedStudents.length === 0}
+              onClick={handleDeleteSelectedStudents}
             >
-              <LogOut className="w-4 h-4" />
-              로그아웃
+              <Trash2 className="w-3 h-3" />
+              삭제
+            </Button>
+
+            {/* 학생 추가 */}
+            <Button size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => setAddStudentOpen(true)}>
+              <Plus className="w-3 h-3" />
+              추가
+            </Button>
+
+            {/* 로그아웃 (우측 끝) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="h-7 px-2 text-xs gap-1 ml-auto"
+            >
+              <LogOut className="w-3 h-3" />
             </Button>
           </div>
         </div>
       </header>
 
       {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 요약 통계 */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">전체 학생</p>
-                  <p className="text-2xl font-bold">{stats.totalStudents}</p>
-                </div>
-                <Users className="w-8 h-8 text-blue-600 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">단어장 수</p>
-                  <p className="text-2xl font-bold">{stats.totalWordlists}</p>
-                </div>
-                <BookOpen className="w-8 h-8 text-green-600 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">평균 진도</p>
-                  <p className="text-2xl font-bold">{stats.avgProgress}%</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-purple-600 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">활동률</p>
-                  <p className="text-2xl font-bold">
-                    {stats.totalStudents > 0 
-                      ? Math.round((stats.activeStudents / stats.totalStudents) * 100)
-                      : 0}%
-                  </p>
-                </div>
-                <Users className="w-8 h-8 text-orange-600 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+      <main className="max-w-7xl mx-auto px-4 py-2">
         {/* 학생 목록 - 테이블 뷰 */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <CardTitle>학생 목록</CardTitle>
-              <Button size="sm" className="gap-2" onClick={() => setAddStudentOpen(true)}>
-                <Plus className="w-4 h-4" />
-                학생 추가
-              </Button>
-            </div>
-
-            {students.length > 0 && (
-              <>
-                <div className="flex items-center gap-4 mb-3">
-                  <Input
-                    placeholder="학생 이름으로 검색..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="max-w-xs"
-                  />
-                </div>
-
-                {/* 전체 선택 + 선택 삭제 버튼 */}
-                <div className="flex items-center justify-between gap-2 pb-3 border-b">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
-                      onCheckedChange={toggleSelectAllStudents}
-                    />
-                    <span className="text-sm font-medium text-muted-foreground">
-                      전체 선택
-                      {selectedStudents.length > 0 && (
-                        <span className="ml-1 text-blue-600 font-semibold">
-                          ({selectedStudents.length}/{filteredStudents.length})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    disabled={selectedStudents.length === 0}
-                    onClick={handleDeleteSelectedStudents}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    선택 삭제
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardHeader>
-          <CardContent>
+        <Card className="mb-4">
+          <CardContent className="p-0">
             {students.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 등록된 학생이 없습니다
