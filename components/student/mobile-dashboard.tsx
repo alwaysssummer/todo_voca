@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
+import { getKoreanNow, toKoreanDateString } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
@@ -44,9 +45,9 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
   // ⭐ 메인 탭 상태 (학습 | 기록)
   const [mainTab, setMainTab] = useState<'study' | 'record'>('study')
 
-  // ⭐ 기록 탭 - 월 선택 상태
+  // ⭐ 기록 탭 - 월 선택 상태, KST 기준
   const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
+    const now = getKoreanNow()  // ⭐ KST 기준
     return { year: now.getFullYear(), month: now.getMonth() }
   })
 
@@ -108,7 +109,7 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
     })
   }, [filteredCompletedSessions])
 
-  // ⭐ 기록 탭용 - 선택한 월의 날짜별 학습 기록
+  // ⭐ 기록 탭용 - 선택한 월의 날짜별 학습 기록, KST 기준
   const recordData = useMemo(() => {
     const { year, month } = selectedMonth
 
@@ -118,7 +119,7 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
 
     for (let d = daysInMonth; d >= 1; d--) {
       const date = new Date(year, month, d)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = toKoreanDateString(date)  // ⭐ KST 기준
       const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
       dates.push({ date, dateStr, dayOfWeek })
     }

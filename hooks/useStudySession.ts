@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { getKoreanToday } from '@/lib/utils'
 import type { Word, Wordlist } from '@/types/word'
 import type {
   GenerationModalData,
@@ -519,7 +520,7 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     if (!student || !currentAssignment) return
 
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getKoreanToday()  // ⭐ KST 기준
 
       // 1. 오늘 생성된 완성 단어장들의 단어만 표시
       const { data: todayCompletedWordlists } = await (supabase as any)
@@ -857,7 +858,7 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     const capturedStudentId = student.id
 
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getKoreanToday()  // ⭐ KST 기준
 
       // 1. 회차 번호 먼저 계산 (정확한 값 사용)
       const actualCompleted = completedCount !== undefined ? completedCount : progress.generationCompleted
@@ -1046,7 +1047,7 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     const capturedStudentId = student.id
     const capturedWordId = currentWord.id
     const capturedWord = currentWord
-    const today = new Date().toISOString().split('T')[0]
+    const today = getKoreanToday()  // ⭐ KST 기준
     const currentSession = progress.session  // ⭐ 현재 회차
     const previousStudied = progress.generationCompleted
     const totalWordCount = currentAssignment.filtered_word_ids?.length || currentWordlist.total_words
@@ -1274,7 +1275,7 @@ export function useStudySession(token: string, assignmentId?: string | null) {
     if (!currentWord || !student) return
 
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = getKoreanToday()  // ⭐ KST 기준
       const currentSession = progress.session  // ⭐ 현재 회차
 
       // skip_count 증가

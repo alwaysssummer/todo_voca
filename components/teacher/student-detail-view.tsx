@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getKoreanNow, getKoreanToday, toKoreanDateString } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -151,7 +152,7 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
     }
   }, [studentId])
 
-  // 학습 요약 통계 로드
+  // 학습 요약 통계 로드, KST 기준
   const loadSummaryStats = useCallback(async () => {
     // 총 완료 단어 수
     const { count: totalCompleted } = await supabase
@@ -160,8 +161,8 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
       .eq('student_id', studentId)
       .eq('status', 'completed')
 
-    // 이번 주 학습량 (completed_wordlists 기준)
-    const now = new Date()
+    // 이번 주 학습량 (completed_wordlists 기준), KST 기준
+    const now = getKoreanNow()  // ⭐ KST 기준
     const dayOfWeek = now.getDay()
     const monday = new Date(now)
     monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
@@ -216,10 +217,10 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
     })
   }, [studentId])
 
-  // 주간 학습량 그래프 데이터 로드
+  // 주간 학습량 그래프 데이터 로드, KST 기준
   const loadWeeklyData = useCallback(async () => {
     const dayNames = ['일', '월', '화', '수', '목', '금', '토']
-    const today = new Date()
+    const today = getKoreanNow()  // ⭐ KST 기준
     const dayOfWeek = today.getDay()
     const monday = new Date(today)
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1))
@@ -230,7 +231,7 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
     for (let i = 0; i < 7; i++) {
       const day = new Date(monday)
       day.setDate(monday.getDate() + i)
-      const dateStr = day.toISOString().split('T')[0]
+      const dateStr = toKoreanDateString(day)  // ⭐ KST 기준
 
       weekData.push({
         label: dayNames[day.getDay()],
@@ -327,10 +328,10 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
 
     const assignmentsList = (assignmentsData as unknown as AssignmentRow[]) || []
 
-    // 배정된 단어장 ID Set
+    // 배정된 단어장 ID Set (원본 + 복습 단어장 모두 포함)
     const assignedWordlistIds = new Set(
       assignmentsList
-        .filter(a => a.generation === 1 && !a.is_auto_generated)
+        .filter(a => a.generation === 1)  // generation 1이면 모두 포함 (복습 단어장도)
         .map(a => a.wordlist_id)
     )
 
@@ -556,6 +557,10 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
   const handleToggleWordlist = async (wordlistId: string, currentlyAssigned: boolean) => {
     setSaving(true)
     try {
+      // 복습 단어장 여부 확인
+      const targetWordlist = allWordlists.find(w => w.id === wordlistId)
+      const isReviewWordlist = targetWordlist?.is_review || false
+
       if (!currentlyAssigned) {
         const { data: teacherData } = await supabase
           .from('users')
@@ -569,7 +574,7 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
           wordlist_id: wordlistId,
           assigned_by: teacherData?.id,
           generation: 1,
-          is_auto_generated: false,
+          is_auto_generated: isReviewWordlist,  // 복습 단어장은 auto_generated로 표시
           base_wordlist_id: wordlistId,
           daily_goal: dailyGoal,
         })
@@ -581,13 +586,13 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
           filtered_word_ids: number[] | null
         }
 
+        // 복습 단어장인 경우와 일반 단어장인 경우 다르게 검색
         const { data: assignmentData } = await supabase
           .from('student_wordlists')
           .select('id, wordlist_id, filtered_word_ids')
           .eq('student_id', studentId)
           .eq('wordlist_id', wordlistId)
           .eq('generation', 1)
-          .eq('is_auto_generated', false)
           .single<AssignmentInfo>()
 
         if (assignmentData) {
@@ -1027,6 +1032,34 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
                   </div>
                 ))}
               </div>
+
+              {/* 복습 단어장 목록 */}
+              {allWordlists.filter(w => w.is_review).length > 0 && (
+                <div className="border rounded p-2 max-h-[200px] overflow-y-auto border-orange-200 bg-orange-50/30">
+                  <div className="text-xs font-medium text-orange-700 mb-2 flex items-center gap-1.5">
+                    <RefreshCw className="h-3 w-3" />
+                    복습 단어장
+                    <Badge variant="outline" className="text-[10px] ml-auto text-orange-600 border-orange-300">
+                      {allWordlists.filter(w => w.is_review).length}개
+                    </Badge>
+                  </div>
+                  {allWordlists.filter(w => w.is_review).map(wordlist => (
+                    <div
+                      key={wordlist.id}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-100/50 rounded cursor-pointer"
+                      onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                    >
+                      <Checkbox
+                        checked={wordlist.isAssigned}
+                        disabled={saving}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1140,8 +1173,8 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
                 <div className="text-xs font-medium text-muted-foreground mb-3">주간 학습량</div>
                 <div className="space-y-1.5">
                   {weeklyData.map((day, idx) => {
-                    const today = new Date().toISOString().split('T')[0]
-                    const isToday = day.date === today
+                    const todayStr = getKoreanToday()  // ⭐ KST 기준
+                    const isToday = day.date === todayStr
 
                     return (
                       <div key={idx} className="flex items-center gap-2">

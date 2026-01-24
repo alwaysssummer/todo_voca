@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useStudentDashboard } from '@/hooks/useStudentDashboard'
+import { getKoreanNow, toKoreanDateString } from '@/lib/utils'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -245,10 +246,10 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     return result
   }, [sessions])
 
-  // 주간 날짜 배열 생성 (월~일) - useMemo 메모화
+  // 주간 날짜 배열 생성 (월~일) - useMemo 메모화, KST 기준
   const weekDays = useMemo(() => {
     const days = []
-    const today = new Date()
+    const today = getKoreanNow()  // ⭐ KST 기준
     const dayOfWeek = today.getDay() // 0(일) ~ 6(토)
     const monday = new Date(today)
     monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)) // 이번주 월요일
@@ -265,9 +266,9 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
     return days
   }, [weekOffset])
 
-  // 월간 달력 배열 생성 - useMemo 메모화
+  // 월간 달력 배열 생성 - useMemo 메모화, KST 기준
   const monthCalendar = useMemo(() => {
-    const today = new Date()
+    const today = getKoreanNow()  // ⭐ KST 기준
     const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1)
     const year = targetDate.getFullYear()
     const month = targetDate.getMonth()
@@ -379,21 +380,32 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
               <BookOpen className="w-5 h-5 text-blue-600" />
               <span className="font-semibold text-lg">{student.name}</span>
             </div>
-            {/* 단어장 선택 드롭다운 (여러 개일 때만) */}
+            {/* 단어장 선택 (탭 형태) */}
             {assignments && assignments.length > 1 ? (
-              <select
-                className="text-sm border rounded-md px-3 py-1.5 bg-white"
-                value={selectedAssignmentIndex}
-                onChange={(e) => setSelectedAssignmentIndex(Number(e.target.value))}
-              >
+              <div className="flex gap-1 flex-wrap justify-end">
                 {assignments.map((assignment, idx) => (
-                  <option key={assignment.id} value={idx}>
-                    {assignment.wordlist_name}
-                    {assignment.is_review ? ' (복습)' : ''}
-                    {' '}({Math.round((assignment.completed_words / assignment.total_words) * 100)}%)
-                  </option>
+                  <Button
+                    key={assignment.id}
+                    variant={selectedAssignmentIndex === idx ? 'default' : 'outline'}
+                    size="sm"
+                    className={`h-7 px-2 text-xs ${
+                      selectedAssignmentIndex === idx
+                        ? ''
+                        : assignment.is_review
+                          ? 'text-orange-600 border-orange-300 hover:bg-orange-50'
+                          : ''
+                    }`}
+                    onClick={() => setSelectedAssignmentIndex(idx)}
+                  >
+                    {assignment.wordlist_name.length > 10
+                      ? assignment.wordlist_name.slice(0, 10) + '..'
+                      : assignment.wordlist_name}
+                    <span className="ml-1 opacity-70">
+                      ({Math.round((assignment.completed_words / assignment.total_words) * 100)}%)
+                    </span>
+                  </Button>
                 ))}
-              </select>
+              </div>
             ) : (
               <span className="text-sm text-muted-foreground">{selectedAssignment.wordlist_name}</span>
             )}
@@ -445,7 +457,7 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                 <p className="text-sm mt-1">학습을 시작해보세요!</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {/* 전체 선택 + 보기 모드 + 출력 버튼들 */}
                 <div className="flex items-center justify-between gap-2 pb-3 border-b flex-wrap">
                   {/* 왼쪽: 전체 선택 + 보기 모드 */}
@@ -550,11 +562,11 @@ export function StudentDashboard({ token }: StudentDashboardProps) {
                   const unknownCount = session.unknown_count || 0
 
                   return (
-                    <Card key={session.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-3">
+                    <Card key={session.id} className="hover:shadow-sm transition-shadow">
+                      <CardContent className="py-1.5 px-3">
                         <div className="flex items-center justify-between">
                           {/* 왼쪽: 체크박스 + 회차 정보 */}
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             {/* 시험지 출력용 체크박스 (Shift+클릭으로 범위 선택 가능) */}
                             <Checkbox
                               checked={selectedSessionsForExam.includes(session.id)}
