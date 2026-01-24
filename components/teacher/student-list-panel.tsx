@@ -2,13 +2,11 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import {
   Plus,
   Trash2,
-  CheckCircle2,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -51,8 +49,8 @@ export function StudentListPanel({
 }: StudentListPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStudents, setSelectedStudents] = useState<string[]>([])
-  const [sortField, setSortField] = useState<'name' | 'lastActivity'>('name')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [sortField, setSortField] = useState<'name' | 'lastActivity'>('lastActivity')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   // 정렬 함수
   const sortStudents = (studentsToSort: Student[]): Student[] => {
@@ -92,14 +90,6 @@ export function StudentListPanel({
     if (diffDays <= 3) return `${diffDays}일 전`
     if (diffDays <= 7) return '1주 전'
     return '1주+'
-  }
-
-  // 단어장 배지 스타일
-  const getSessionBadgeStyle = (current: number, total: number): string => {
-    if (total === 0) return 'bg-gray-100 text-gray-600'
-    if (current >= total) return 'bg-green-100 text-green-700'
-    if (current > 0) return 'bg-blue-100 text-blue-700'
-    return 'bg-gray-100 text-gray-600'
   }
 
   // 체크박스 토글
@@ -224,7 +214,7 @@ export function StudentListPanel({
           filteredStudents.map((student) => (
             <div
               key={student.id}
-              className={`flex items-start gap-2 p-2.5 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
+              className={`flex items-center gap-2 px-2.5 py-2 border-b cursor-pointer hover:bg-muted/50 transition-colors ${
                 selectedStudentId === student.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
               }`}
               onClick={() => onSelectStudent(student.id)}
@@ -234,49 +224,20 @@ export function StudentListPanel({
                 checked={selectedStudents.includes(student.id)}
                 onCheckedChange={() => {}}
                 onClick={(e) => toggleStudentSelection(student.id, e)}
-                className="h-4 w-4 mt-0.5"
+                className="h-4 w-4"
               />
 
-              {/* 학생 정보 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm truncate">{student.name}</span>
-                  <span className={`text-xs ${
-                    formatRelativeTime(student.lastActivityAt) === '오늘' ? 'text-green-600 font-medium' :
-                    formatRelativeTime(student.lastActivityAt) === '-' ? 'text-muted-foreground' :
-                    ''
-                  }`}>
-                    {formatRelativeTime(student.lastActivityAt)}
-                  </span>
-                </div>
+              {/* 학생 이름 */}
+              <span className="font-medium text-sm truncate flex-1">{student.name}</span>
 
-                {/* 단어장 배지 (최대 2개) */}
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {student.wordlists.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">배정 없음</span>
-                  ) : (
-                    student.wordlists.slice(0, 2).map((wl) => (
-                      <Badge
-                        key={wl.id}
-                        variant="outline"
-                        className={`text-[10px] py-0 px-1.5 h-4 ${getSessionBadgeStyle(wl.currentSession, wl.totalSessions)}`}
-                      >
-                        {wl.name.length > 6 ? wl.name.slice(0, 6) + '..' : wl.name}
-                        {' '}
-                        {wl.currentSession}/{wl.totalSessions}
-                        {wl.currentSession >= wl.totalSessions && wl.totalSessions > 0 && (
-                          <CheckCircle2 className="w-2.5 h-2.5 ml-0.5" />
-                        )}
-                      </Badge>
-                    ))
-                  )}
-                  {student.wordlists.length > 2 && (
-                    <Badge variant="outline" className="text-[10px] py-0 px-1 h-4">
-                      +{student.wordlists.length - 2}
-                    </Badge>
-                  )}
-                </div>
-              </div>
+              {/* 최근 활동 */}
+              <span className={`text-xs shrink-0 ${
+                formatRelativeTime(student.lastActivityAt) === '오늘' ? 'text-green-600 font-medium' :
+                formatRelativeTime(student.lastActivityAt) === '-' ? 'text-muted-foreground' :
+                'text-muted-foreground'
+              }`}>
+                {formatRelativeTime(student.lastActivityAt)}
+              </span>
             </div>
           ))
         )}

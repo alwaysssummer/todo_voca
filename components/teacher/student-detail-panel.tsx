@@ -19,20 +19,20 @@ import {
   Trash2,
   BookOpen,
   RefreshCw,
-  Monitor,
   Smartphone,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Save,
   Calendar,
   Target,
   TrendingUp,
   Clock,
-  CheckCircle2,
-  XCircle,
   User,
   Printer,
   FileText,
+  BarChart3,
+  Settings,
 } from 'lucide-react'
 import { ExamPrintModal } from '@/components/student/exam-print-modal'
 import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
@@ -132,8 +132,8 @@ export function StudentDetailPanel({ studentId }: StudentDetailPanelProps) {
   const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([])
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>('')
 
-  // 우측 패널 탭 (학습기록 / 단어배정)
-  const [rightPanelTab, setRightPanelTab] = useState<'records' | 'wordlists'>('records')
+  // 단어배정 섹션 펼침/접힘
+  const [wordlistSectionOpen, setWordlistSectionOpen] = useState(false)
 
   // 학습기록 체크박스 선택
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set())
@@ -828,291 +828,338 @@ export function StudentDetailPanel({ studentId }: StudentDetailPanelProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* 헤더: 이름 + 요약 통계 + 모바일 버튼 */}
-      <div className="px-3 py-2 border-b bg-white flex items-center gap-3">
+      <div className="px-4 py-3 border-b bg-white flex items-center gap-4">
         <span className="text-lg font-semibold">{student.name}</span>
         <div className="flex-1" />
-        <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1">
-            <Target className="h-3 w-3 text-muted-foreground" />
-            <span className="font-semibold">{summaryStats.totalCompletedWords}</span>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 rounded">
+            <Target className="h-4 w-4 text-blue-600" />
+            <span className="font-semibold text-blue-700">{summaryStats.totalCompletedWords}</span>
+            <span className="text-xs text-blue-500">총학습</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-3 w-3 text-muted-foreground" />
-            <span className="font-semibold">{summaryStats.weeklyLearned}</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded">
+            <Calendar className="h-4 w-4 text-green-600" />
+            <span className="font-semibold text-green-700">{summaryStats.weeklyLearned}</span>
+            <span className="text-xs text-green-500">이번주</span>
           </div>
-          <div className="flex items-center gap-1">
-            <TrendingUp className="h-3 w-3 text-muted-foreground" />
-            <span className="font-semibold">{summaryStats.avgAccuracy}%</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-50 rounded">
+            <TrendingUp className="h-4 w-4 text-purple-600" />
+            <span className="font-semibold text-purple-700">{summaryStats.avgAccuracy}%</span>
+            <span className="text-xs text-purple-500">정답률</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3 text-muted-foreground" />
-            <span className="font-semibold">{formatRelativeTime(summaryStats.lastActivityAt)}</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded">
+            <Clock className="h-4 w-4 text-gray-500" />
+            <span className="font-medium text-gray-600">{formatRelativeTime(summaryStats.lastActivityAt)}</span>
           </div>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="h-7 px-2 text-xs gap-1"
+          className="h-8 px-3 text-xs gap-1.5"
           onClick={() => window.open(`${baseUrl}/s/${student.access_token}/mobile/dashboard`, '_blank')}
         >
-          <Smartphone className="h-3.5 w-3.5" />
+          <Smartphone className="h-4 w-4" />
           모바일
         </Button>
       </div>
 
-      {/* 메인 콘텐츠: 좌우 분할 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 좌측: 학생 iframe (65%) */}
-        <div className="flex-[65] border-r overflow-hidden">
-          <iframe
-            src={`${baseUrl}/s/${student.access_token}/dashboard`}
-            className="w-full h-full border-0"
-            title="학생 대시보드"
-          />
-        </div>
-
-        {/* 우측: 탭 패널 (35%) */}
-        <div className="flex-[35] flex flex-col overflow-hidden bg-muted/10">
-          {/* 탭 버튼 */}
-          <div className="flex border-b bg-white">
-            <button
-              className={`flex-1 py-2 text-xs font-medium border-b-2 transition-colors ${
-                rightPanelTab === 'records'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setRightPanelTab('records')}
-            >
-              📅 학습기록
-            </button>
-            <button
-              className={`flex-1 py-2 text-xs font-medium border-b-2 transition-colors ${
-                rightPanelTab === 'wordlists'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-              onClick={() => setRightPanelTab('wordlists')}
-            >
-              📚 단어배정
-            </button>
+      {/* 메인 콘텐츠: 상하 분할 */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* 상단: 학습 현황 (주간 차트 + 학습기록 테이블) */}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* 학습 현황 헤더 */}
+          <div className="px-4 py-2 bg-muted/30 border-b flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">학습 현황</span>
+            {selectedSessionIds.size > 0 && (
+              <div className="flex items-center gap-1 ml-auto">
+                <Badge variant="secondary" className="text-xs">{selectedSessionIds.size}개 선택</Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={() => { setExamPrintType('known'); setExamPrintOpen(true) }}
+                >
+                  <FileText className="h-3 w-3" />
+                  O시험지
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={() => { setExamPrintType('unknown'); setExamPrintOpen(true) }}
+                >
+                  <FileText className="h-3 w-3" />
+                  X시험지
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={() => { setVocabPrintType('known'); setVocabPrintOpen(true) }}
+                >
+                  <Printer className="h-3 w-3" />
+                  O단어장
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={() => { setVocabPrintType('unknown'); setVocabPrintOpen(true) }}
+                >
+                  <Printer className="h-3 w-3" />
+                  X단어장
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* 탭 내용 */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {rightPanelTab === 'records' ? (
-              // 학습기록 탭 - 테이블 형태
-              <div className="space-y-2">
-                {/* 출력 버튼 영역 */}
-                {selectedSessionIds.size > 0 && (
-                  <div className="flex flex-wrap gap-1 p-2 bg-blue-50 rounded border border-blue-200">
-                    <span className="text-xs text-blue-700 mr-1">{selectedSessionIds.size}개 선택</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      onClick={() => { setExamPrintType('known'); setExamPrintOpen(true) }}
-                    >
-                      <FileText className="h-3 w-3" />
-                      O시험지
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      onClick={() => { setExamPrintType('unknown'); setExamPrintOpen(true) }}
-                    >
-                      <FileText className="h-3 w-3" />
-                      X시험지
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      onClick={() => { setVocabPrintType('known'); setVocabPrintOpen(true) }}
-                    >
-                      <Printer className="h-3 w-3" />
-                      O단어장
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 px-2 text-[10px] gap-1"
-                      onClick={() => { setVocabPrintType('unknown'); setVocabPrintOpen(true) }}
-                    >
-                      <Printer className="h-3 w-3" />
-                      X단어장
-                    </Button>
-                  </div>
-                )}
-
-                <div className="border rounded bg-white overflow-hidden">
-                  {sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Calendar className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-xs">학습 기록이 없습니다</p>
-                    </div>
-                  ) : (
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/50 sticky top-0">
-                        <tr>
-                          <th className="px-1 py-1.5 text-center font-medium border-b w-8">
-                            <Checkbox
-                              checked={selectedSessionIds.size > 0 && selectedSessionIds.size === sessionsTable.rows.flatMap(r => r.allSessionIds).length}
-                              onCheckedChange={toggleAllSelection}
-                              className="h-3 w-3"
-                            />
-                          </th>
-                          <th className="px-1 py-1.5 text-left font-medium border-b">날짜</th>
-                          {sessionsTable.wordlists.map((wl) => (
-                            <th key={wl.id} className="px-1 py-1.5 text-center font-medium border-b">
-                              {wl.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {sessionsTable.rows.map((row) => {
-                          const rowSelected = row.allSessionIds.length > 0 && row.allSessionIds.every(id => selectedSessionIds.has(id))
-                          const rowIndeterminate = !rowSelected && row.allSessionIds.some(id => selectedSessionIds.has(id))
-
-                          return (
-                            <tr key={row.date} className={`hover:bg-muted/30 ${rowSelected ? 'bg-blue-50' : ''}`}>
-                              <td className="px-1 py-1 text-center">
-                                <Checkbox
-                                  checked={rowSelected}
-                                  ref={(el) => {
-                                    if (el) (el as any).indeterminate = rowIndeterminate
-                                  }}
-                                  onCheckedChange={() => toggleRowSelection(row.allSessionIds)}
-                                  className="h-3 w-3"
-                                />
-                              </td>
-                              <td className="px-1 py-1 text-muted-foreground whitespace-nowrap">
-                                {row.dateLabel}
-                                <span className="text-[10px] ml-0.5">({row.dayName})</span>
-                              </td>
-                              {sessionsTable.wordlists.map((wl) => {
-                                const cellData = row.sessions.get(wl.id)
-                                const sessionNumbers = cellData?.sessionNumbers || []
-                                const sessionIds = cellData?.sessionIds || []
-                                const cellSelected = sessionIds.length > 0 && sessionIds.every(id => selectedSessionIds.has(id))
-                                const cellIndeterminate = !cellSelected && sessionIds.some(id => selectedSessionIds.has(id))
-
-                                return (
-                                  <td key={wl.id} className={`px-1 py-1 text-center ${cellSelected ? 'bg-blue-100' : ''}`}>
-                                    {sessionIds.length > 0 ? (
-                                      <div
-                                        className="flex items-center justify-center gap-1 cursor-pointer hover:bg-blue-50 rounded px-1"
-                                        onClick={() => toggleCellSelection(sessionIds)}
-                                      >
-                                        <Checkbox
-                                          checked={cellSelected}
-                                          ref={(el) => {
-                                            if (el) (el as any).indeterminate = cellIndeterminate
-                                          }}
-                                          onCheckedChange={() => toggleCellSelection(sessionIds)}
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="h-3 w-3"
-                                        />
-                                        <span className="text-blue-600 font-medium">
-                                          {sessionNumbers.sort((a, b) => a - b).join(',')}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <span className="text-gray-300">-</span>
-                                    )}
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            ) : (
-              // 단어배정 탭
-              <div className="space-y-2">
-                {/* 회차 목표 설정 */}
-                <div className="flex items-center gap-2 p-2 bg-white rounded border">
-                  <span className="text-xs text-muted-foreground">회차목표:</span>
-                  <Select value={String(dailyGoal)} onValueChange={(v) => setDailyGoal(parseInt(v))}>
-                    <SelectTrigger className="w-16 h-6 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[5, 10, 15, 20, 25, 30].map((num) => (
-                        <SelectItem key={num} value={String(num)}>{num}개</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button variant="outline" size="sm" className="h-6 px-2 gap-1" onClick={saveDailyGoal} disabled={savingGoal}>
-                    {savingGoal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                  </Button>
-                </div>
-
-                {/* 단어장 배정 체크리스트 */}
-                <div className="border rounded bg-white overflow-hidden">
-                  <div className="px-2 py-1.5 bg-muted/50 border-b text-xs font-medium flex items-center gap-1">
-                    <BookOpen className="h-3 w-3" />
-                    단어장
-                  </div>
-                  <div className="max-h-[200px] overflow-y-auto">
-                    {allWordlists.filter(w => !w.is_review).map(wordlist => (
-                      <div
-                        key={wordlist.id}
-                        className="flex items-center gap-1.5 py-1 px-2 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
-                        onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
-                      >
-                        <Checkbox checked={wordlist.isAssigned} disabled={saving} className="h-3.5 w-3.5" />
-                        <span className="text-xs truncate flex-1">{wordlist.name}</span>
-                        <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+          {/* 학습 현황 콘텐츠: 주간 차트 + 학습기록 테이블 */}
+          <div className="flex-1 flex overflow-hidden min-h-[200px]">
+            {/* 좌측: 주간 차트 */}
+            <div className="w-[200px] border-r p-3 flex flex-col bg-white">
+              <div className="text-xs font-medium text-muted-foreground mb-3">주간 학습량</div>
+              <div className="flex-1 flex items-end gap-1.5 min-h-[100px]">
+                {weeklyData.length === 0 ? (
+                  // 데이터 로딩 중 플레이스홀더
+                  Array.from({ length: 7 }).map((_, idx) => (
+                    <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="flex-1 w-full flex items-end min-h-[60px]">
+                        <div className="w-full h-1 bg-gray-100 rounded-t" />
                       </div>
-                    ))}
+                      <div className="text-[10px] text-muted-foreground">-</div>
+                      <div className="text-[10px] font-medium">-</div>
+                    </div>
+                  ))
+                ) : (
+                  weeklyData.map((day, idx) => {
+                    const heightPercent = maxWeeklyCount > 0 ? (day.count / maxWeeklyCount) * 100 : 0
+                    const isToday = day.date === getKoreanToday()
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="flex-1 w-full flex items-end min-h-[60px]">
+                          <div
+                            className={`w-full rounded-t transition-all ${
+                              isToday ? 'bg-blue-500' : day.count > 0 ? 'bg-blue-300' : 'bg-gray-100'
+                            }`}
+                            style={{ height: `${Math.max(heightPercent, 5)}%`, minHeight: '4px' }}
+                          />
+                        </div>
+                        <div className={`text-[10px] ${isToday ? 'text-blue-600 font-semibold' : 'text-muted-foreground'}`}>
+                          {day.label}
+                        </div>
+                        <div className={`text-[10px] font-medium ${isToday ? 'text-blue-600' : ''}`}>
+                          {day.count > 0 ? day.count : '-'}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 우측: 학습기록 테이블 */}
+            <div className="flex-1 overflow-auto p-3">
+              {sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  <div className="text-center">
+                    <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">학습 기록이 없습니다</p>
+                  </div>
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 sticky top-0">
+                    <tr>
+                      <th className="px-2 py-2 text-center font-medium border-b w-10">
+                        <Checkbox
+                          checked={selectedSessionIds.size > 0 && selectedSessionIds.size === sessionsTable.rows.flatMap(r => r.allSessionIds).length}
+                          onCheckedChange={toggleAllSelection}
+                          className="h-3.5 w-3.5"
+                        />
+                      </th>
+                      <th className="px-2 py-2 text-left font-medium border-b">날짜</th>
+                      {sessionsTable.wordlists.map((wl) => (
+                        <th key={wl.id} className="px-2 py-2 text-left font-medium border-b">
+                          {wl.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {sessionsTable.rows.map((row) => {
+                      const rowSelected = row.allSessionIds.length > 0 && row.allSessionIds.every(id => selectedSessionIds.has(id))
+                      const rowIndeterminate = !rowSelected && row.allSessionIds.some(id => selectedSessionIds.has(id))
+
+                      return (
+                        <tr key={row.date} className={`hover:bg-muted/30 ${rowSelected ? 'bg-blue-50' : ''}`}>
+                          <td className="px-2 py-1.5 text-center">
+                            <Checkbox
+                              checked={rowSelected}
+                              ref={(el) => {
+                                if (el) (el as any).indeterminate = rowIndeterminate
+                              }}
+                              onCheckedChange={() => toggleRowSelection(row.allSessionIds)}
+                              className="h-3.5 w-3.5"
+                            />
+                          </td>
+                          <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
+                            {row.dateLabel}
+                            <span className="text-[10px] ml-1">({row.dayName})</span>
+                          </td>
+                          {sessionsTable.wordlists.map((wl) => {
+                            const cellData = row.sessions.get(wl.id)
+                            const sessionNumbers = cellData?.sessionNumbers || []
+                            const sessionIds = cellData?.sessionIds || []
+                            const cellSelected = sessionIds.length > 0 && sessionIds.every(id => selectedSessionIds.has(id))
+                            const cellIndeterminate = !cellSelected && sessionIds.some(id => selectedSessionIds.has(id))
+
+                            return (
+                              <td key={wl.id} className={`px-2 py-1.5 ${cellSelected ? 'bg-blue-100' : ''}`}>
+                                {sessionIds.length > 0 ? (
+                                  <div
+                                    className="flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded px-1 w-fit"
+                                    onClick={() => toggleCellSelection(sessionIds)}
+                                  >
+                                    <Checkbox
+                                      checked={cellSelected}
+                                      ref={(el) => {
+                                        if (el) (el as any).indeterminate = cellIndeterminate
+                                      }}
+                                      onCheckedChange={() => toggleCellSelection(sessionIds)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-3.5 w-3.5"
+                                    />
+                                    <span className="text-blue-600 font-medium">
+                                      {sessionNumbers.sort((a, b) => a - b).join(',')}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 하단: 단어배정 (접히는 아코디언) */}
+        <div className="border-t bg-white">
+          {/* 아코디언 헤더 */}
+          <button
+            className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-muted/30 transition-colors"
+            onClick={() => setWordlistSectionOpen(!wordlistSectionOpen)}
+          >
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">단어배정</span>
+            <Badge variant="secondary" className="text-xs">{flatAssignments.length}개 배정</Badge>
+            <div className="flex-1" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>회차목표: {dailyGoal}개</span>
+            </div>
+            {wordlistSectionOpen ? (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            )}
+          </button>
+
+          {/* 아코디언 콘텐츠 */}
+          {wordlistSectionOpen && (
+            <div className="border-t px-4 py-3">
+              <div className="flex gap-4">
+                {/* 좌측: 회차 목표 + 단어장 배정 */}
+                <div className="flex-1 space-y-3">
+                  {/* 회차 목표 설정 */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">회차목표:</span>
+                    <Select value={String(dailyGoal)} onValueChange={(v) => setDailyGoal(parseInt(v))}>
+                      <SelectTrigger className="w-20 h-7 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[5, 10, 15, 20, 25, 30].map((num) => (
+                          <SelectItem key={num} value={String(num)}>{num}개</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" className="h-7 px-2 gap-1" onClick={saveDailyGoal} disabled={savingGoal}>
+                      {savingGoal ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                      저장
+                    </Button>
+                  </div>
+
+                  {/* 단어장 배정 체크리스트 */}
+                  <div className="flex gap-3">
+                    {/* 일반 단어장 */}
+                    <div className="flex-1 border rounded overflow-hidden">
+                      <div className="px-2 py-1.5 bg-muted/50 border-b text-xs font-medium flex items-center gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        단어장
+                      </div>
+                      <div className="max-h-[180px] overflow-y-auto">
+                        {allWordlists.filter(w => !w.is_review).map(wordlist => (
+                          <div
+                            key={wordlist.id}
+                            className="flex items-center gap-1.5 py-1.5 px-2 hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
+                            onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          >
+                            <Checkbox checked={wordlist.isAssigned} disabled={saving} className="h-3.5 w-3.5" />
+                            <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 복습 단어장 */}
+                    {allWordlists.filter(w => w.is_review).length > 0 && (
+                      <div className="flex-1 border rounded overflow-hidden border-orange-200">
+                        <div className="px-2 py-1.5 bg-orange-50 border-b border-orange-200 text-xs font-medium text-orange-700 flex items-center gap-1">
+                          <RefreshCw className="h-3 w-3" />
+                          복습 단어장
+                        </div>
+                        <div className="max-h-[180px] overflow-y-auto">
+                          {allWordlists.filter(w => w.is_review).map(wordlist => (
+                            <div
+                              key={wordlist.id}
+                              className="flex items-center gap-1.5 py-1.5 px-2 hover:bg-orange-50 cursor-pointer border-b border-orange-100 last:border-b-0"
+                              onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                            >
+                              <Checkbox checked={wordlist.isAssigned} disabled={saving} className="h-3.5 w-3.5" />
+                              <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                              <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* 복습 단어장 */}
-                {allWordlists.filter(w => w.is_review).length > 0 && (
-                  <div className="border rounded bg-white overflow-hidden border-orange-200">
-                    <div className="px-2 py-1.5 bg-orange-50 border-b border-orange-200 text-xs font-medium text-orange-700 flex items-center gap-1">
-                      <RefreshCw className="h-3 w-3" />
-                      복습 단어장
-                    </div>
-                    <div className="max-h-[150px] overflow-y-auto">
-                      {allWordlists.filter(w => w.is_review).map(wordlist => (
-                        <div
-                          key={wordlist.id}
-                          className="flex items-center gap-1.5 py-1 px-2 hover:bg-orange-50 cursor-pointer border-b border-orange-100 last:border-b-0"
-                          onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
-                        >
-                          <Checkbox checked={wordlist.isAssigned} disabled={saving} className="h-3.5 w-3.5" />
-                          <span className="text-xs truncate flex-1">{wordlist.name}</span>
-                          <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 배정된 단어장 트리 */}
+                {/* 우측: 배정 현황 트리 */}
                 {assignments.length > 0 && (
-                  <div className="border rounded bg-white overflow-hidden">
+                  <div className="w-[280px] border rounded overflow-hidden">
                     <div className="px-2 py-1.5 bg-muted/50 border-b text-xs font-medium flex items-center gap-1">
                       <BookOpen className="h-3 w-3" />
                       배정 현황
                       <Badge variant="secondary" className="text-[10px] ml-auto">{flatAssignments.length}개</Badge>
                     </div>
-                    <div className="p-2 max-h-[150px] overflow-y-auto">
+                    <div className="p-2 max-h-[180px] overflow-y-auto">
                       {assignments.map(node => renderTreeNode(node))}
                     </div>
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
