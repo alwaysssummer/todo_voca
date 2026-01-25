@@ -133,21 +133,9 @@ export function ExamPrintModal({
     }, 100)
   }
 
-  // 인쇄용 콘텐츠 렌더링
+  // 인쇄용 콘텐츠 렌더링 (접이식 레이아웃: 좌측 영어, 우측 한글)
   const renderPrintContent = () => {
     if (!open || words.length === 0) return null
-
-    const leftColumn: Word[] = []
-    const rightColumn: Word[] = []
-    
-    // 좌우 컬럼 분배 (좌측 먼저 채우기)
-    words.forEach((word, index) => {
-      if (index < Math.ceil(words.length / 2)) {
-        leftColumn.push(word)
-      } else {
-        rightColumn.push(word)
-      }
-    })
 
     return (
       <div
@@ -158,33 +146,33 @@ export function ExamPrintModal({
           left: '-9999px'
         }}
       >
-        {/* 인쇄 전용 스타일 */}
+        {/* 인쇄 전용 스타일 - 접이식 레이아웃 */}
         <style dangerouslySetInnerHTML={{__html: `
           @media print {
             /* 모든 일반 콘텐츠 숨기기 */
             body * {
               visibility: hidden !important;
             }
-            
+
             /* 인쇄 콘텐츠만 표시 */
             #exam-print-content,
             #exam-print-content * {
               visibility: visible !important;
             }
-            
-            /* 페이지 설정 */
+
+            /* 페이지 설정: A4 가로 */
             @page {
-              size: A4;
-              margin: 2cm;
+              size: A4 landscape;
+              margin: 1cm 1.5cm;
             }
-            
+
             /* HTML, Body 설정 */
             html, body {
               width: 100% !important;
               margin: 0 !important;
               padding: 0 !important;
             }
-            
+
             /* 인쇄 콘텐츠 배치 */
             #exam-print-content {
               position: absolute !important;
@@ -193,55 +181,69 @@ export function ExamPrintModal({
               width: 100% !important;
               display: block !important;
             }
-            
-            /* 시험지: 항상 페이지 끝에서 끊기 */
-            .exam-section {
-              page-break-after: always !important;
+
+            /* 접이식 컨테이너 */
+            .fold-container {
+              display: flex !important;
+              width: 100% !important;
+              min-height: 100vh !important;
             }
-            
-            /* 답지: 새 페이지에서 시작 */
-            .answer-section {
-              page-break-before: always !important;
+
+            /* 좌측 영역 (영어) */
+            .fold-left {
+              width: 50% !important;
+              border-right: 2px dashed #888 !important;
+              padding-right: 1cm !important;
+              box-sizing: border-box !important;
             }
-            
-            /* 페이지 구분자: 빈 페이지 강제 */
-            .page-break-spacer {
-              page-break-after: always !important;
-              visibility: hidden !important;
-              height: 1px !important;
+
+            /* 우측 영역 (한글) */
+            .fold-right {
+              width: 50% !important;
+              padding-left: 1cm !important;
+              box-sizing: border-box !important;
             }
           }
         `}} />
 
-        {/* 시험지 (문제지) - 영어만 */}
-        <div className="exam-section">
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            marginBottom: '32px',
-            color: '#000'
+        {/* 접이식 시험지: 좌측 영어 | 우측 한글 */}
+        <div className="fold-container" style={{ display: 'flex', width: '100%' }}>
+          {/* 좌측: 영어 단어 (시험 볼 때 보이는 면) */}
+          <div className="fold-left" style={{
+            width: '50%',
+            paddingRight: '1cm',
+            borderRight: '2px dashed #888'
           }}>
-            {title}
-          </h1>
+            {/* 헤더 */}
+            <div style={{ marginBottom: '16px', color: '#000' }}>
+              <div style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                marginBottom: '12px'
+              }}>
+                {type === 'known' ? 'O-TEST' : 'X-TEST'}
+              </div>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '12px',
+                borderBottom: '1px solid #000',
+                paddingBottom: '8px'
+              }}>
+                <span>이름: ________________</span>
+                <span>날짜: ____/____</span>
+              </div>
+            </div>
 
-          <div style={{
-            display: 'flex',
-            gap: '4rem',
-            color: '#000'
-          }}>
-            {/* 좌측 컬럼 */}
-            <div style={{
-              flex: 1,
-              borderRight: '1px solid #d1d5db',
-              paddingRight: '2rem'
-            }}>
-              {leftColumn.map((word, index) => (
+            {/* 영어 단어 목록 */}
+            <div style={{ color: '#000' }}>
+              {words.map((word, index) => (
                 <div
                   key={word.id}
                   style={{
-                    marginBottom: '12px',
-                    lineHeight: '1.8',
-                    fontSize: '14px'
+                    marginBottom: '6px',
+                    lineHeight: '1.6',
+                    fontSize: '13px'
                   }}
                 >
                   {index + 1}. {word.word_text}
@@ -249,83 +251,48 @@ export function ExamPrintModal({
               ))}
             </div>
 
-            {/* 우측 컬럼 */}
+            {/* 점수란 */}
             <div style={{
-              flex: 1,
-              paddingLeft: '2rem'
+              marginTop: '20px',
+              paddingTop: '12px',
+              borderTop: '1px solid #ccc',
+              fontSize: '12px',
+              textAlign: 'right',
+              color: '#000'
             }}>
-              {rightColumn.map((word, index) => (
-                <div
-                  key={word.id}
-                  style={{
-                    marginBottom: '12px',
-                    lineHeight: '1.8',
-                    fontSize: '14px'
-                  }}
-                >
-                  {leftColumn.length + index + 1}. {word.word_text}
-                </div>
-              ))}
+              점수: _______ / {words.length}
             </div>
           </div>
-        </div>
 
-        {/* 빈 페이지 구분자: 시험지 끝 후 강제 페이지 분할 */}
-        <div className="page-break-spacer"></div>
-
-        {/* 답지 (정답지) - 영어 + 한글 뜻 */}
-        <div className="answer-section" style={{ marginTop: '64px' }}>
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            marginBottom: '32px',
-            color: '#000',
-            borderTop: '2px solid #000',
-            paddingTop: '32px'
+          {/* 우측: 한글 뜻 (채점할 때 펼쳐서 보는 면) */}
+          <div className="fold-right" style={{
+            width: '50%',
+            paddingLeft: '1cm'
           }}>
-            정답지
-          </h1>
-
-          <div style={{
-            display: 'flex',
-            gap: '4rem',
-            color: '#000'
-          }}>
-            {/* 좌측 컬럼 */}
+            {/* 헤더 */}
             <div style={{
-              flex: 1,
-              borderRight: '1px solid #d1d5db',
-              paddingRight: '2rem'
+              marginBottom: '16px',
+              color: '#000',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid #000',
+              paddingBottom: '8px'
             }}>
-              {leftColumn.map((word, index) => (
-                <div
-                  key={word.id}
-                  style={{
-                    marginBottom: '12px',
-                    lineHeight: '1.8',
-                    fontSize: '14px'
-                  }}
-                >
-                  {index + 1}. {word.word_text} : {word.meaning}
-                </div>
-              ))}
+              정답
             </div>
 
-            {/* 우측 컬럼 */}
-            <div style={{
-              flex: 1,
-              paddingLeft: '2rem'
-            }}>
-              {rightColumn.map((word, index) => (
+            {/* 한글 뜻 목록 */}
+            <div style={{ color: '#000' }}>
+              {words.map((word, index) => (
                 <div
                   key={word.id}
                   style={{
-                    marginBottom: '12px',
-                    lineHeight: '1.8',
-                    fontSize: '14px'
+                    marginBottom: '6px',
+                    lineHeight: '1.6',
+                    fontSize: '13px'
                   }}
                 >
-                  {leftColumn.length + index + 1}. {word.word_text} : {word.meaning}
+                  {index + 1}. {word.meaning}
                 </div>
               ))}
             </div>
