@@ -102,10 +102,10 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
         }
       })
     return Array.from(uniqueMap.values()).sort((a, b) => {
-      if (a.session_number === b.session_number) {
-        return new Date(a.completed_date).getTime() - new Date(b.completed_date).getTime()
-      }
-      return a.session_number - b.session_number
+      // 최근 날짜 우선, 같은 날짜면 회차 내림차순
+      const dateCompare = new Date(b.completed_date).getTime() - new Date(a.completed_date).getTime()
+      if (dateCompare !== 0) return dateCompare
+      return b.session_number - a.session_number
     })
   }, [filteredCompletedSessions])
 

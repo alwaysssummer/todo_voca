@@ -139,6 +139,9 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
   // 학습기록 체크박스 선택
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set())
 
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<'records' | 'sessions'>('records')
+
   // 출력 모달
   const [examPrintOpen, setExamPrintOpen] = useState(false)
   const [examPrintType, setExamPrintType] = useState<'known' | 'unknown'>('known')
@@ -897,11 +900,31 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 상단: 학습 현황 (주간 차트 + 학습기록 테이블) */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* 학습 현황 헤더 */}
+          {/* 탭 헤더 */}
           <div className="px-4 py-2 bg-muted/30 border-b flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">학습 현황</span>
-            {selectedSessionIds.size > 0 && (
+            {/* 탭 버튼 */}
+            <div className="flex gap-1">
+              <Button
+                variant={activeTab === 'records' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => setActiveTab('records')}
+              >
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                학습현황
+              </Button>
+              <Button
+                variant={activeTab === 'sessions' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => setActiveTab('sessions')}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                회차상세
+              </Button>
+            </div>
+            {/* 학습현황 탭의 출력 버튼들 */}
+            {activeTab === 'records' && selectedSessionIds.size > 0 && (
               <div className="flex items-center gap-1 ml-auto">
                 <Badge variant="secondary" className="text-xs">{selectedSessionIds.size}개 선택</Badge>
                 <Button
@@ -944,95 +967,179 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
             )}
           </div>
 
-          {/* 학습 현황 콘텐츠: 학습기록 테이블 + 단어장 배정 */}
+          {/* 탭 콘텐츠: 학습기록 테이블 또는 회차상세 + 단어장 배정 */}
           <div className="flex-1 flex overflow-hidden min-h-[200px]">
-            {/* 좌측: 학습기록 테이블 */}
+            {/* 좌측: 탭 콘텐츠 */}
             <div className="flex-1 overflow-auto p-3">
-              {sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">학습 기록이 없습니다</p>
+              {activeTab === 'records' ? (
+                /* 학습현황 탭: 날짜 x 단어장 매트릭스 */
+                sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">학습 기록이 없습니다</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="bg-muted/50 sticky top-0">
-                    <tr>
-                      <th className="px-2 py-2 text-center font-medium border-b w-10">
-                        <Checkbox
-                          checked={selectedSessionIds.size > 0 && selectedSessionIds.size === sessionsTable.rows.flatMap(r => r.allSessionIds).length}
-                          onCheckedChange={toggleAllSelection}
-                          className="h-3.5 w-3.5"
-                        />
-                      </th>
-                      <th className="px-2 py-2 text-left font-medium border-b">날짜</th>
-                      {sessionsTable.wordlists.map((wl) => (
-                        <th key={wl.id} className="px-2 py-2 text-left font-medium border-b">
-                          {wl.name}
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-2 text-center font-medium border-b w-10">
+                          <Checkbox
+                            checked={selectedSessionIds.size > 0 && selectedSessionIds.size === sessionsTable.rows.flatMap(r => r.allSessionIds).length}
+                            onCheckedChange={toggleAllSelection}
+                            className="h-3.5 w-3.5"
+                          />
                         </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {sessionsTable.rows.map((row) => {
-                      const rowSelected = row.allSessionIds.length > 0 && row.allSessionIds.every(id => selectedSessionIds.has(id))
-                      const rowIndeterminate = !rowSelected && row.allSessionIds.some(id => selectedSessionIds.has(id))
+                        <th className="px-2 py-2 text-left font-medium border-b">날짜</th>
+                        {sessionsTable.wordlists.map((wl) => (
+                          <th key={wl.id} className="px-2 py-2 text-left font-medium border-b">
+                            {wl.name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {sessionsTable.rows.map((row) => {
+                        const rowSelected = row.allSessionIds.length > 0 && row.allSessionIds.every(id => selectedSessionIds.has(id))
+                        const rowIndeterminate = !rowSelected && row.allSessionIds.some(id => selectedSessionIds.has(id))
 
-                      return (
-                        <tr key={row.date} className={`hover:bg-muted/30 ${rowSelected ? 'bg-blue-50' : ''}`}>
-                          <td className="px-2 py-1.5 text-center">
-                            <Checkbox
-                              checked={rowSelected}
-                              ref={(el) => {
-                                if (el) (el as any).indeterminate = rowIndeterminate
-                              }}
-                              onCheckedChange={() => toggleRowSelection(row.allSessionIds)}
-                              className="h-3.5 w-3.5"
-                            />
-                          </td>
+                        return (
+                          <tr key={row.date} className={`hover:bg-muted/30 ${rowSelected ? 'bg-blue-50' : ''}`}>
+                            <td className="px-2 py-1.5 text-center">
+                              <Checkbox
+                                checked={rowSelected}
+                                ref={(el) => {
+                                  if (el) (el as any).indeterminate = rowIndeterminate
+                                }}
+                                onCheckedChange={() => toggleRowSelection(row.allSessionIds)}
+                                className="h-3.5 w-3.5"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
+                              {row.dateLabel}
+                              <span className="text-[10px] ml-1">({row.dayName})</span>
+                            </td>
+                            {sessionsTable.wordlists.map((wl) => {
+                              const cellData = row.sessions.get(wl.id)
+                              const sessionNumbers = cellData?.sessionNumbers || []
+                              const sessionIds = cellData?.sessionIds || []
+                              const cellSelected = sessionIds.length > 0 && sessionIds.every(id => selectedSessionIds.has(id))
+                              const cellIndeterminate = !cellSelected && sessionIds.some(id => selectedSessionIds.has(id))
+
+                              return (
+                                <td key={wl.id} className={`px-2 py-1.5 ${cellSelected ? 'bg-blue-100' : ''}`}>
+                                  {sessionIds.length > 0 ? (
+                                    <div
+                                      className="flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded px-1 w-fit"
+                                      onClick={() => toggleCellSelection(sessionIds)}
+                                    >
+                                      <Checkbox
+                                        checked={cellSelected}
+                                        ref={(el) => {
+                                          if (el) (el as any).indeterminate = cellIndeterminate
+                                        }}
+                                        onCheckedChange={() => toggleCellSelection(sessionIds)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="h-3.5 w-3.5"
+                                      />
+                                      <span className="text-blue-600 font-medium">
+                                        {sessionNumbers.sort((a, b) => a - b).join(',')}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-300">-</span>
+                                  )}
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )
+              ) : (
+                /* 회차상세 탭: 날짜 x 단어장 매트릭스 (O/X + TEST 점수 상세) */
+                sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    <div className="text-center">
+                      <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">완료된 회차가 없습니다</p>
+                    </div>
+                  </div>
+                ) : (
+                  <table className="text-xs">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="px-2 py-2 text-left font-medium border-b whitespace-nowrap">날짜</th>
+                        {sessionsTable.wordlists.map((wl) => (
+                          <th key={wl.id} className="px-2 py-2 text-left font-medium border-b whitespace-nowrap">
+                            <div className="truncate max-w-[160px]" title={wl.name}>
+                              {wl.name.length > 16 ? wl.name.slice(0, 16) + '...' : wl.name}
+                            </div>
+                            <div className="text-[9px] text-muted-foreground font-normal mt-0.5">
+                              회 / O / X / O-T / X-T
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {sessionsTable.rows.map((row) => (
+                        <tr key={row.date} className="hover:bg-muted/30">
                           <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
                             {row.dateLabel}
                             <span className="text-[10px] ml-1">({row.dayName})</span>
                           </td>
                           {sessionsTable.wordlists.map((wl) => {
                             const cellData = row.sessions.get(wl.id)
-                            const sessionNumbers = cellData?.sessionNumbers || []
                             const sessionIds = cellData?.sessionIds || []
-                            const cellSelected = sessionIds.length > 0 && sessionIds.every(id => selectedSessionIds.has(id))
-                            const cellIndeterminate = !cellSelected && sessionIds.some(id => selectedSessionIds.has(id))
+
+                            // 해당 날짜+단어장의 세션들 찾기
+                            const cellSessions = completedSessions.filter(s => sessionIds.includes(s.id))
+
+                            if (cellSessions.length === 0) {
+                              return (
+                                <td key={wl.id} className="px-2 py-1.5 text-left">
+                                  <span className="text-gray-300">-</span>
+                                </td>
+                              )
+                            }
 
                             return (
-                              <td key={wl.id} className={`px-2 py-1.5 ${cellSelected ? 'bg-blue-100' : ''}`}>
-                                {sessionIds.length > 0 ? (
-                                  <div
-                                    className="flex items-center gap-1 cursor-pointer hover:bg-blue-50 rounded px-1 w-fit"
-                                    onClick={() => toggleCellSelection(sessionIds)}
-                                  >
-                                    <Checkbox
-                                      checked={cellSelected}
-                                      ref={(el) => {
-                                        if (el) (el as any).indeterminate = cellIndeterminate
-                                      }}
-                                      onCheckedChange={() => toggleCellSelection(sessionIds)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="h-3.5 w-3.5"
-                                    />
-                                    <span className="text-blue-600 font-medium">
-                                      {sessionNumbers.sort((a, b) => a - b).join(',')}
+                              <td key={wl.id} className="px-2 py-1 text-left">
+                                {cellSessions.map((session) => (
+                                  <div key={session.id} className="flex items-center justify-start gap-1 text-[10px] py-0.5">
+                                    <span className="font-medium text-gray-600 w-5">
+                                      {String(session.session_number).padStart(2, '0')}
+                                    </span>
+                                    <span className="text-green-600 w-4">{session.word_count}</span>
+                                    <span className="text-orange-600 w-4">{session.unknown_count}</span>
+                                    <span className="w-8">
+                                      {session.o_test_completed ? (
+                                        <span className="text-green-600">{session.o_test_correct}/{session.o_test_total}</span>
+                                      ) : (
+                                        <span className="text-gray-300">-</span>
+                                      )}
+                                    </span>
+                                    <span className="w-8">
+                                      {session.x_test_completed ? (
+                                        <span className="text-orange-600">{session.x_test_correct}/{session.x_test_total}</span>
+                                      ) : (
+                                        <span className="text-gray-300">-</span>
+                                      )}
                                     </span>
                                   </div>
-                                ) : (
-                                  <span className="text-gray-300">-</span>
-                                )}
+                                ))}
                               </td>
                             )
                           })}
                         </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                )
               )}
             </div>
 
