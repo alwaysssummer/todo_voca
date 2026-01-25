@@ -95,11 +95,13 @@ export function OverviewDashboard({ students, onSelectStudent }: OverviewDashboa
       // 각 학생별 통계 계산
       const statsPromises = students.map(async (student) => {
         // 오늘 학습량
+        interface WordCountData { word_count: number }
         const { data: todayData } = await supabase
           .from('completed_wordlists')
           .select('word_count')
           .eq('student_id', student.id)
           .gte('completed_date', today)
+          .returns<WordCountData[]>()
 
         const todayWords = (todayData || []).reduce((sum, d) => sum + (d.word_count || 0), 0)
 
@@ -109,14 +111,17 @@ export function OverviewDashboard({ students, onSelectStudent }: OverviewDashboa
           .select('word_count')
           .eq('student_id', student.id)
           .gte('created_at', weekStart)
+          .returns<WordCountData[]>()
 
         const weeklyWords = (weeklyData || []).reduce((sum, d) => sum + (d.word_count || 0), 0)
 
         // 정답률
+        interface TestData { correct_count: number; total_count: number }
         const { data: testData } = await supabase
           .from('online_tests')
           .select('correct_count, total_count')
           .eq('student_id', student.id)
+          .returns<TestData[]>()
 
         let accuracy: number | null = null
         if (testData && testData.length > 0) {
@@ -161,6 +166,7 @@ export function OverviewDashboard({ students, onSelectStudent }: OverviewDashboa
           .select('word_count')
           .in('student_id', studentIds)
           .eq('completed_date', dateStr)
+          .returns<{ word_count: number }[]>()
 
         const count = (dayData || []).reduce((sum, d) => sum + (d.word_count || 0), 0)
         weeklyChartData.push({ label: dayLabel, date: dateStr, count })
