@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { useStudySession } from '@/hooks/useStudySession'
-import { useTTS } from '@/hooks/useTTS'
+import { useTTS, unlockAudioGlobal } from '@/hooks/useTTS'
 import { Loader2, Volume2, BookOpen, X } from 'lucide-react'
 
 // 모달 컴포넌트 동적 임포트 (초기 번들 크기 감소)
@@ -55,6 +55,24 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
 
   // TTS (발음 재생)
   const { speak, prefetchTTS, isPlaying, isLoading: ttsLoading } = useTTS()
+
+  // ⭐ 안드로이드: 첫 터치 시 오디오 시스템 unlock
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      unlockAudioGlobal()
+      // 한 번만 실행
+      document.removeEventListener('touchstart', handleFirstInteraction)
+      document.removeEventListener('click', handleFirstInteraction)
+    }
+
+    document.addEventListener('touchstart', handleFirstInteraction, { passive: true })
+    document.addEventListener('click', handleFirstInteraction)
+
+    return () => {
+      document.removeEventListener('touchstart', handleFirstInteraction)
+      document.removeEventListener('click', handleFirstInteraction)
+    }
+  }, [])
 
   // ⭐ 현재 단어 변경 시 TTS 프리페칭
   useEffect(() => {

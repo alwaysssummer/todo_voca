@@ -7,6 +7,67 @@ const CACHE_MAX_SIZE = 50
 // 오디오 unlock 상태 (모듈 레벨)
 let isAudioUnlocked = false
 
+// ⭐ 전역 오디오 unlock 함수 (페이지 첫 터치 시 호출용)
+export function unlockAudioGlobal() {
+  if (isAudioUnlocked) return
+
+  console.log('🔓 [TTS] 오디오 시스템 unlock 시도...')
+
+  // 1. HTML5 Audio unlock
+  try {
+    const audio = new Audio()
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+    audio.volume = 0.001
+    audio.muted = true
+    const playPromise = audio.play()
+    if (playPromise) {
+      playPromise.then(() => {
+        audio.pause()
+        audio.muted = false
+        console.log('🔓 [TTS] HTML5 Audio unlock 성공')
+      }).catch((e) => {
+        console.log('🔓 [TTS] HTML5 Audio unlock 실패:', e.message)
+      })
+    }
+  } catch (e) {
+    console.log('🔓 [TTS] HTML5 Audio 예외:', e)
+  }
+
+  // 2. Web Speech API unlock (안드로이드용)
+  if ('speechSynthesis' in window) {
+    try {
+      // 안드로이드: speechSynthesis 강제 활성화
+      const utterance = new SpeechSynthesisUtterance(' ')
+      utterance.volume = 0.001
+      utterance.rate = 10 // 빠르게 끝내기
+      speechSynthesis.cancel()
+      speechSynthesis.speak(utterance)
+
+      // 즉시 취소하지 않고 잠시 후 취소 (안드로이드 버그 대응)
+      setTimeout(() => {
+        speechSynthesis.cancel()
+        console.log('🔓 [TTS] speechSynthesis unlock 완료')
+      }, 100)
+    } catch (e) {
+      console.log('🔓 [TTS] speechSynthesis 예외:', e)
+    }
+  }
+
+  // 3. AudioContext unlock (일부 기기용)
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+    if (AudioContextClass) {
+      const ctx = new AudioContextClass()
+      ctx.resume().then(() => {
+        console.log('🔓 [TTS] AudioContext unlock 성공')
+        ctx.close()
+      }).catch(() => {})
+    }
+  } catch (e) {}
+
+  isAudioUnlocked = true
+}
+
 export function useTTS() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -29,34 +90,23 @@ export function useTTS() {
 
     loadVoices()
     speechSynthesis.addEventListener('voiceschanged', loadVoices)
-    const retryTimer = setTimeout(loadVoices, 1000)
+
+    // 안드로이드: 여러 번 재시도
+    const retryTimers = [
+      setTimeout(loadVoices, 500),
+      setTimeout(loadVoices, 1000),
+      setTimeout(loadVoices, 2000),
+    ]
 
     return () => {
       speechSynthesis.removeEventListener('voiceschanged', loadVoices)
-      clearTimeout(retryTimer)
+      retryTimers.forEach(clearTimeout)
     }
   }, [])
 
   // ⭐ 오디오 unlock (사용자 제스처 내에서 호출)
   const unlockAudio = useCallback(() => {
-    if (isAudioUnlocked) return
-
-    const audio = new Audio()
-    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
-    audio.volume = 0.01
-    audio.play().then(() => {
-      audio.pause()
-      console.log('🔓 [TTS] Audio unlock 완료')
-    }).catch(() => {})
-
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance('')
-      utterance.volume = 0
-      speechSynthesis.speak(utterance)
-      speechSynthesis.cancel()
-    }
-
-    isAudioUnlocked = true
+    unlockAudioGlobal()
   }, [])
 
   // ⭐ TTS 데이터 가져오기 (Blob URL 반환)
