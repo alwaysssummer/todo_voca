@@ -382,32 +382,37 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
                     <p className="text-sm mt-1">학습을 시작해보세요!</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {/* 회차 목록 */}
-                    {sessions.map((session) => {
-                      const knownCount = session.word_count || 0
-                      const unknownCount = session.unknown_count || 0
+                  <div className="border rounded-lg overflow-hidden">
+                    {/* 회차 테이블 */}
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="py-2 px-2 text-center text-xs font-medium text-gray-500">회차</th>
+                          <th className="py-2 px-2 text-center text-xs font-medium text-gray-500">날짜</th>
+                          <th className="py-2 px-2 text-center text-xs font-medium text-gray-500">O</th>
+                          <th className="py-2 px-2 text-center text-xs font-medium text-gray-500">X</th>
+                          <th className="py-2 px-2 text-center text-xs font-medium text-gray-500">평가</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessions.map((session) => {
+                          const knownCount = session.word_count || 0
+                          const unknownCount = session.unknown_count || 0
 
-                      return (
-                        <Card key={session.id} className="hover:shadow-md transition-shadow border-2">
-                          <CardContent className="p-4">
-                            {/* 회차 번호 + 날짜 */}
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="font-bold text-lg">
-                                {String(session.session_number).padStart(2, '0')}회차
-                              </div>
-                              <div className="text-sm text-muted-foreground">
+                          return (
+                            <tr key={session.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                              {/* 회차 */}
+                              <td className="py-2 px-2 text-center font-semibold">
+                                {String(session.session_number).padStart(2, '0')}
+                              </td>
+                              {/* 날짜 */}
+                              <td className="py-2 px-2 text-center text-gray-500">
                                 {(new Date(session.completed_date).getMonth() + 1)}/{new Date(session.completed_date).getDate()}
-                              </div>
-                            </div>
-
-                            {/* O-TEST 영역 */}
-                            <div className="mb-3 pb-3 border-b">
-                              <div className="flex items-center justify-between">
-                                <Button
-                                  variant="ghost"
-                                  size="lg"
-                                  className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 h-12"
+                              </td>
+                              {/* O (아는 단어) */}
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  className="text-green-600 font-semibold hover:text-green-700 hover:bg-green-50 px-2 py-1 rounded transition-colors"
                                   onClick={() => {
                                     setSelectedKnownSession({
                                       id: session.id,
@@ -417,49 +422,17 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
                                     setKnownWordsOpen(true)
                                   }}
                                 >
-                                  <CheckCircle2 className="w-5 h-5" />
-                                  <span className="text-base font-semibold">{knownCount}</span>
-                                </Button>
-
-                                {/* O-TEST 평가 상태 */}
-                                <div className="flex items-center justify-center min-w-[5rem]">
-                                  {session.o_test_completed ? (
-                                    <div
-                                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                      onClick={() => handleViewTestResult(
-                                        session.session_number,
-                                        'known',
-                                        session.o_test_wrong_word_ids
-                                      )}
-                                      title="테스트 결과 보기"
-                                    >
-                                      <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-                                      <span className="text-base font-semibold text-green-700">
-                                        {session.o_test_correct}/{session.o_test_total}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <button
-                                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
-                                      onClick={() => {
-                                        sessionStorage.setItem('dashboardMode', 'mobile')
-                                        router.push(`/s/${token}/test/${session.id}?type=known`)
-                                      }}
-                                      title="O-TEST 평가 시작"
-                                      aria-label="O-TEST 평가 시작하기"
-                                    />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* X-TEST 영역 */}
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <Button
-                                  variant="ghost"
-                                  size="lg"
-                                  className="gap-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 h-12"
+                                  {knownCount}
+                                </button>
+                              </td>
+                              {/* X (모르는 단어) */}
+                              <td className="py-2 px-2 text-center">
+                                <button
+                                  className={`font-semibold px-2 py-1 rounded transition-colors ${
+                                    unknownCount > 0
+                                      ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50'
+                                      : 'text-gray-400'
+                                  }`}
                                   onClick={() => {
                                     if (unknownCount > 0) {
                                       setSelectedSession({
@@ -472,52 +445,65 @@ export function MobileDashboard({ token, initialAssignmentId }: MobileDashboardP
                                   }}
                                   disabled={unknownCount === 0}
                                 >
-                                  <XCircle className="w-5 h-5" />
-                                  <span className="text-base font-semibold">{unknownCount}</span>
-                                </Button>
-
-                                {/* X-TEST 평가 상태 */}
-                                <div className="flex items-center justify-center min-w-[5rem]">
+                                  {unknownCount}
+                                </button>
+                              </td>
+                              {/* 평가 */}
+                              <td className="py-2 px-2 text-center">
+                                <div className="flex items-center justify-center gap-1 text-xs">
+                                  {/* O-TEST */}
+                                  {session.o_test_completed ? (
+                                    <span
+                                      className="text-green-600 font-medium cursor-pointer hover:underline"
+                                      onClick={() => handleViewTestResult(
+                                        session.session_number,
+                                        'known',
+                                        session.o_test_wrong_word_ids
+                                      )}
+                                    >
+                                      {session.o_test_correct}/{session.o_test_total}
+                                    </span>
+                                  ) : (
+                                    <button
+                                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
+                                      onClick={() => {
+                                        sessionStorage.setItem('dashboardMode', 'mobile')
+                                        router.push(`/s/${token}/test/${session.id}?type=known`)
+                                      }}
+                                      title="O-TEST"
+                                    />
+                                  )}
+                                  {/* X-TEST */}
                                   {unknownCount === 0 ? (
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
-                                      <span className="text-base font-semibold text-orange-700">
-                                        0/0
-                                      </span>
-                                    </div>
+                                    <span className="text-orange-400 font-medium">-</span>
                                   ) : session.x_test_completed ? (
-                                    <div
-                                      className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                    <span
+                                      className="text-orange-600 font-medium cursor-pointer hover:underline"
                                       onClick={() => handleViewTestResult(
                                         session.session_number,
                                         'unknown',
                                         session.x_test_wrong_word_ids
                                       )}
-                                      title="테스트 결과 보기"
                                     >
-                                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500 flex-shrink-0" />
-                                      <span className="text-base font-semibold text-orange-700">
-                                        {session.x_test_correct}/{session.x_test_total}
-                                      </span>
-                                    </div>
+                                      {session.x_test_correct}/{session.x_test_total}
+                                    </span>
                                   ) : (
                                     <button
-                                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center"
+                                      className="w-5 h-5 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors"
                                       onClick={() => {
                                         sessionStorage.setItem('dashboardMode', 'mobile')
                                         router.push(`/s/${token}/test/${session.id}?type=unknown`)
                                       }}
-                                      title="X-TEST 평가 시작"
-                                      aria-label="X-TEST 평가 시작하기"
+                                      title="X-TEST"
                                     />
                                   )}
                                 </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </CardContent>

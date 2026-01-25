@@ -18,6 +18,7 @@ import { WholeVocabularyPrintModal } from '@/components/student/whole-vocabulary
 import { StudentListPanel, Student, WordlistProgress } from '@/components/teacher/student-list-panel'
 import { StudentDetailPanel } from '@/components/teacher/student-detail-panel'
 import { WordlistManagementTab, Wordlist } from '@/components/teacher/wordlist-management-tab'
+import { OverviewDashboard } from '@/components/teacher/overview-dashboard'
 
 export default function TeacherDashboard() {
   const router = useRouter()
@@ -161,16 +162,13 @@ export default function TeacherDashboard() {
 
       setWordlists(wordlistsWithCount)
 
-      // 첫 번째 학생 자동 선택
-      if (studentsWithWordlists.length > 0 && !selectedStudentId) {
-        setSelectedStudentId(studentsWithWordlists[0].id)
-      }
+      // 첫 번째 학생 자동 선택 제거 - 로고 클릭 시 전체 현황 대시보드 표시
     } catch (err) {
       console.error('대시보드 데이터 로드 실패:', err)
     } finally {
       setLoading(false)
     }
-  }, [selectedStudentId])
+  }, [])
 
   useEffect(() => {
     loadDashboardData()
@@ -267,15 +265,18 @@ export default function TeacherDashboard() {
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-full mx-auto px-4 py-2">
           <div className="flex items-center gap-4">
-            {/* 로고 */}
-            <div className="flex items-center gap-2">
+            {/* 로고 - 클릭 시 전체 현황으로 이동 */}
+            <button
+              onClick={() => setSelectedStudentId(null)}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            >
               <div className="w-7 h-7 bg-gradient-to-br from-purple-600 to-blue-600 rounded flex items-center justify-center">
                 <BookOpen className="w-4 h-4 text-white" />
               </div>
               <span className="font-bold text-lg bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                 Todo Voca
               </span>
-            </div>
+            </button>
 
             {/* 메인 탭 */}
             <div className="flex gap-1 ml-4">
@@ -318,7 +319,7 @@ export default function TeacherDashboard() {
         // 학생관리 탭: 마스터-디테일 레이아웃
         <div className="flex-1 flex overflow-hidden">
           {/* 좌측: 학생 목록 */}
-          <div className="w-80 flex-shrink-0">
+          <div className="w-64 flex-shrink-0">
             <StudentListPanel
               students={students}
               selectedStudentId={selectedStudentId}
@@ -329,8 +330,15 @@ export default function TeacherDashboard() {
             />
           </div>
 
-          {/* 우측: 학생 상세 */}
-          <StudentDetailPanel studentId={selectedStudentId} />
+          {/* 우측: 학생 상세 또는 전체 현황 */}
+          {selectedStudentId ? (
+            <StudentDetailPanel studentId={selectedStudentId} onRefresh={loadDashboardData} />
+          ) : (
+            <OverviewDashboard
+              students={students}
+              onSelectStudent={setSelectedStudentId}
+            />
+          )}
         </div>
       ) : (
         // 단어장관리 탭
