@@ -56,21 +56,65 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
   // TTS (발음 재생)
   const { speak, prefetchTTS, isPlaying, isLoading: ttsLoading } = useTTS()
 
-  // ⭐ 안드로이드: 첫 터치 시 오디오 시스템 unlock
+  // ⭐ 안드로이드: 오디오 시스템 unlock (더 강력한 버전)
   useEffect(() => {
+    let unlockCount = 0
+    const maxUnlocks = 5 // 더 많은 unlock 시도
+
     const handleFirstInteraction = () => {
       unlockAudioGlobal()
-      // 한 번만 실행
-      document.removeEventListener('touchstart', handleFirstInteraction)
-      document.removeEventListener('click', handleFirstInteraction)
+      unlockCount++
+      console.log(`🔓 [Study] 오디오 unlock 시도 ${unlockCount}/${maxUnlocks}`)
+
+      if (unlockCount >= maxUnlocks) {
+        document.removeEventListener('touchstart', handleFirstInteraction)
+        document.removeEventListener('touchend', handleFirstInteraction)
+        document.removeEventListener('click', handleFirstInteraction)
+        document.removeEventListener('pointerdown', handleFirstInteraction)
+        console.log('🔓 [Study] 오디오 unlock 완료')
+      }
     }
 
+    // ⭐ 다양한 이벤트 리스너 등록 (안드로이드 호환성)
     document.addEventListener('touchstart', handleFirstInteraction, { passive: true })
+    document.addEventListener('touchend', handleFirstInteraction, { passive: true })
     document.addEventListener('click', handleFirstInteraction)
+    document.addEventListener('pointerdown', handleFirstInteraction, { passive: true })
+
+    // ⭐ 페이지 로드 시 즉시 unlock 시도
+    setTimeout(() => unlockAudioGlobal(), 100)
+    setTimeout(() => unlockAudioGlobal(), 500)
+
+    // ⭐ 안드로이드: 페이지 visibility 변경 시 재활성화
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('🔓 [Study] 페이지 visible - 오디오 재활성화')
+        unlockAudioGlobal()
+        if ('speechSynthesis' in window) {
+          try {
+            speechSynthesis.resume()
+          } catch (e) {
+            // 무시
+          }
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // ⭐ 포커스 변경 시에도 재활성화
+    const handleFocus = () => {
+      console.log('🔓 [Study] 윈도우 포커스 - 오디오 재활성화')
+      unlockAudioGlobal()
+    }
+    window.addEventListener('focus', handleFocus)
 
     return () => {
       document.removeEventListener('touchstart', handleFirstInteraction)
+      document.removeEventListener('touchend', handleFirstInteraction)
       document.removeEventListener('click', handleFirstInteraction)
+      document.removeEventListener('pointerdown', handleFirstInteraction)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
     }
   }, [])
 
@@ -649,9 +693,12 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
               >
                 {currentWord.word_text}
               </h1>
-              {/* 발음 버튼 */}
+              {/* 발음 버튼 - 클릭 시 unlock 후 재생 */}
               <button
-                onClick={() => speak(currentWord.word_text)}
+                onClick={() => {
+                  unlockAudioGlobal()  // ⭐ 클릭 시점에 unlock 확실히
+                  speak(currentWord.word_text)
+                }}
                 disabled={isPlaying || ttsLoading}
                 className="p-2 sm:p-3 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 flex-shrink-0"
                 title="발음 듣기"
@@ -835,10 +882,11 @@ export function StudyScreen({ token, assignmentId }: StudyScreenProps) {
                 >
                   {dontKnowWord.word_text}
                 </div>
-                {/* 발음 버튼 */}
+                {/* 발음 버튼 - 클릭 시 unlock 후 재생 */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation() // 카드 클릭(일시정지) 이벤트 전파 방지
+                    unlockAudioGlobal()  // ⭐ 클릭 시점에 unlock 확실히
                     speak(dontKnowWord.word_text)
                   }}
                   disabled={isPlaying || ttsLoading}

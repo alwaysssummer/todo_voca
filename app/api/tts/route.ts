@@ -8,13 +8,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 })
     }
 
-    const apiKey = process.env.GOOGLE_CLOUD_TTS_API_KEY
+    // ⭐ 환경변수 우선순위: GOOGLE_CLOUD_TTS_API_KEY > NEXT_PUBLIC_GOOGLE_API_KEY
+    const apiKey = process.env.GOOGLE_CLOUD_TTS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_API_KEY
     console.log('🔑 [TTS] API Key exists:', !!apiKey)
-    console.log('🔑 [TTS] API Key length:', apiKey?.length)
-    
+    console.log('🔑 [TTS] API Key source:', process.env.GOOGLE_CLOUD_TTS_API_KEY ? 'GOOGLE_CLOUD_TTS_API_KEY' : 'NEXT_PUBLIC_GOOGLE_API_KEY')
+
     if (!apiKey) {
-      // API 키 미설정은 운영상 정상적인 상황일 수 있음 (브라우저 TTS 폴백 사용)
-      console.warn('⚠️ [TTS] GOOGLE_CLOUD_TTS_API_KEY 미설정 - 클라이언트에서 브라우저 TTS 사용')
+      console.warn('⚠️ [TTS] Google API Key 미설정 - 클라이언트에서 브라우저 TTS 사용')
       return NextResponse.json(
         { error: 'TTS API key not configured - using browser fallback' },
         { status: 503 }
