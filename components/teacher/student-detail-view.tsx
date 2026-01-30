@@ -32,7 +32,25 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  GripVertical,
 } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface StudentDetailViewProps {
   studentId: string
@@ -50,7 +68,43 @@ interface WordlistInfo {
   name: string
   total_words: number
   isAssigned: boolean
+  isHidden: boolean
   is_review?: boolean
+  completedWords?: number
+  totalWords?: number
+  display_order?: number
+  assignment_id?: string
+}
+
+// Sortable Item 컴포넌트
+function SortableAssignmentItem({ wordlist, children }: { wordlist: WordlistInfo; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: wordlist.assignment_id || wordlist.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1">
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-accent rounded"
+      >
+        <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
+      </div>
+      {children}
+    </div>
+  )
 }
 
 interface AssignmentWithStats {
@@ -122,6 +176,14 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
   const [assignments, setAssignments] = useState<TreeNode[]>([])
   const [allWordlists, setAllWordlists] = useState<WordlistInfo[]>([])
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+
+  // dnd-kit 센서
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   const [dailyGoal, setDailyGoal] = useState<number>(20)
   const [savingGoal, setSavingGoal] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -308,6 +370,8 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
       daily_goal: number | null
       current_session: number | null
       filtered_word_ids: number[] | null
+      is_hidden: boolean | null
+      display_order: number | null
     }
 
     const { data: assignmentsData } = await supabase
@@ -321,27 +385,71 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
         parent_assignment_id,
         daily_goal,
         current_session,
-        filtered_word_ids
+        filtered_word_ids,
+        is_hidden,
+        display_order
       `)
       .eq('student_id', studentId)
-      .order('assigned_at', { ascending: true })
+      .order('display_order', { ascending: true })
 
     const assignmentsList = (assignmentsData as unknown as AssignmentRow[]) || []
 
-    // 배정된 단어장 ID Set (원본 + 복습 단어장 모두 포함)
-    const assignedWordlistIds = new Set(
+    // 배정된 단어장 정보 맵 (원본 + 복습 단어장 모두 포함)
+    const assignmentMap = new Map<string, { isAssigned: boolean; isHidden: boolean; assignmentId: string; display_order: number }>(
       assignmentsList
         .filter(a => a.generation === 1)  // generation 1이면 모두 포함 (복습 단어장도)
-        .map(a => a.wordlist_id)
+        .map(a => [a.wordlist_id, {
+          isAssigned: true,
+          isHidden: a.is_hidden || false,
+          assignmentId: a.id,
+          display_order: a.display_order ?? 999
+        }])
     )
 
-    // 단어장 목록 구성
-    const wordlistInfos: WordlistInfo[] = allWl.map(wl => ({
-      id: wl.id,
-      name: wl.name,
-      total_words: wl.total_words,
-      isAssigned: assignedWordlistIds.has(wl.id),
-      is_review: wl.is_review || false
+    // 단어장 목록 구성 (진행률 정보 포함)
+    const wordlistInfos: WordlistInfo[] = await Promise.all(allWl.map(async (wl) => {
+      const assignmentInfo = assignmentMap.get(wl.id)
+      let completedWords = 0
+      let totalWords = wl.total_words
+
+      // 숨김 처리된 단어장의 경우 진행률 계산
+      if (assignmentInfo?.isHidden) {
+        const assignment = assignmentsList.find(a => a.wordlist_id === wl.id && a.generation === 1)
+        let targetWordIds: number[] = assignment?.filtered_word_ids || []
+
+        if (targetWordIds.length === 0) {
+          const { data: wordsData } = await supabase
+            .from('words')
+            .select('id')
+            .eq('wordlist_id', wl.id)
+          targetWordIds = wordsData?.map((w: { id: number }) => w.id) || []
+        }
+
+        totalWords = targetWordIds.length || wl.total_words
+
+        if (targetWordIds.length > 0) {
+          const { count } = await supabase
+            .from('student_word_progress')
+            .select('*', { count: 'exact', head: true })
+            .eq('student_id', studentId)
+            .eq('status', 'completed')
+            .in('word_id', targetWordIds)
+          completedWords = count || 0
+        }
+      }
+
+      return {
+        id: wl.id,
+        name: wl.name,
+        total_words: wl.total_words,
+        isAssigned: assignmentInfo?.isAssigned || false,
+        isHidden: assignmentInfo?.isHidden || false,
+        is_review: wl.is_review || false,
+        completedWords,
+        totalWords,
+        display_order: assignmentInfo?.display_order ?? 999,
+        assignment_id: assignmentInfo?.assignmentId
+      }
     }))
 
     setAllWordlists(wordlistInfos)
@@ -553,8 +661,51 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
     loadAllData()
   }, [loadAllData])
 
-  // 단어장 배정/해제
-  const handleToggleWordlist = async (wordlistId: string, currentlyAssigned: boolean) => {
+  // 드래그앤드롭 순서 변경 핸들러
+  const handleDragEnd = async (event: DragEndEvent, isReview: boolean) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    // 해당 타입(일반/복습)의 배정된 단어장만 필터링
+    const assignedWordlists = allWordlists
+      .filter(w => w.isAssigned && !w.isHidden && (w.is_review || false) === isReview)
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+
+    const oldIndex = assignedWordlists.findIndex(w => w.assignment_id === active.id)
+    const newIndex = assignedWordlists.findIndex(w => w.assignment_id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = arrayMove(assignedWordlists, oldIndex, newIndex)
+
+    // 로컬 상태 즉시 업데이트
+    const newWordlists = allWordlists.map(w => {
+      const reorderedIndex = reordered.findIndex(r => r.id === w.id)
+      if (reorderedIndex !== -1) {
+        return { ...w, display_order: reorderedIndex }
+      }
+      return w
+    })
+    setAllWordlists(newWordlists)
+
+    // DB 업데이트
+    try {
+      for (let i = 0; i < reordered.length; i++) {
+        const item = reordered[i]
+        if (item.assignment_id) {
+          await (supabase as any)
+            .from('student_wordlists')
+            .update({ display_order: i })
+            .eq('id', item.assignment_id)
+        }
+      }
+    } catch (error) {
+      console.error('순서 저장 실패:', error)
+      await loadAllData()  // 실패 시 롤백
+    }
+  }
+
+  // 단어장 배정/해제 (숨김 처리)
+  const handleToggleWordlist = async (wordlistId: string, currentlyAssigned: boolean, isCurrentlyHidden: boolean = false) => {
     setSaving(true)
     try {
       // 복습 단어장 여부 확인
@@ -562,6 +713,7 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
       const isReviewWordlist = targetWordlist?.is_review || false
 
       if (!currentlyAssigned) {
+        // 새로 배정
         const { data: teacherData } = await supabase
           .from('users')
           .select('id')
@@ -574,30 +726,26 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
           wordlist_id: wordlistId,
           assigned_by: teacherData?.id,
           generation: 1,
-          is_auto_generated: isReviewWordlist,  // 복습 단어장은 auto_generated로 표시
+          is_auto_generated: isReviewWordlist,
           base_wordlist_id: wordlistId,
           daily_goal: dailyGoal,
         })
-      } else {
-        // 배정 해제 - 재귀 삭제
-        interface AssignmentInfo {
-          id: string
-          wordlist_id: string
-          filtered_word_ids: number[] | null
-        }
-
-        // 복습 단어장인 경우와 일반 단어장인 경우 다르게 검색
-        const { data: assignmentData } = await supabase
+      } else if (isCurrentlyHidden) {
+        // 숨김 해제 (복원)
+        await (supabase as any)
           .from('student_wordlists')
-          .select('id, wordlist_id, filtered_word_ids')
+          .update({ is_hidden: false })
           .eq('student_id', studentId)
           .eq('wordlist_id', wordlistId)
           .eq('generation', 1)
-          .single<AssignmentInfo>()
-
-        if (assignmentData) {
-          await deleteAssignmentRecursively(assignmentData.id, assignmentData.wordlist_id, assignmentData.filtered_word_ids)
-        }
+      } else {
+        // 숨김 처리 (학습 기록 보존)
+        await (supabase as any)
+          .from('student_wordlists')
+          .update({ is_hidden: true })
+          .eq('student_id', studentId)
+          .eq('wordlist_id', wordlistId)
+          .eq('generation', 1)
       }
 
       await loadAllData()
@@ -1016,46 +1164,180 @@ export function StudentDetailView({ studentId }: StudentDetailViewProps) {
               {/* 단어장 배정 */}
               <div className="border rounded p-2 max-h-[250px] overflow-y-auto">
                 <div className="text-xs font-medium text-muted-foreground mb-2">단어장 배정</div>
-                {allWordlists.filter(w => !w.is_review).map(wordlist => (
-                  <div
-                    key={wordlist.id}
-                    className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded cursor-pointer"
-                    onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(e) => handleDragEnd(e, false)}
+                >
+                  <SortableContext
+                    items={allWordlists
+                      .filter(w => !w.is_review && !w.isHidden && w.isAssigned)
+                      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                      .map(w => w.assignment_id || w.id)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Checkbox
-                      checked={wordlist.isAssigned}
-                      disabled={saving}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span className="text-xs truncate flex-1">{wordlist.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* 복습 단어장 목록 */}
-              {allWordlists.filter(w => w.is_review).length > 0 && (
-                <div className="border rounded p-2 max-h-[200px] overflow-y-auto border-orange-200 bg-orange-50/30">
-                  <div className="text-xs font-medium text-orange-700 mb-2 flex items-center gap-1.5">
-                    <RefreshCw className="h-3 w-3" />
-                    복습 단어장
-                    <Badge variant="outline" className="text-[10px] ml-auto text-orange-600 border-orange-300">
-                      {allWordlists.filter(w => w.is_review).length}개
-                    </Badge>
-                  </div>
-                  {allWordlists.filter(w => w.is_review).map(wordlist => (
+                    {/* 배정된 단어장 (드래그 가능) */}
+                    {allWordlists
+                      .filter(w => !w.is_review && !w.isHidden && w.isAssigned)
+                      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                      .map(wordlist => (
+                        <SortableAssignmentItem key={wordlist.assignment_id || wordlist.id} wordlist={wordlist}>
+                          <div
+                            className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded cursor-pointer flex-1"
+                            onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned, false)}
+                          >
+                            <Checkbox
+                              checked={wordlist.isAssigned}
+                              disabled={saving}
+                              className="h-3.5 w-3.5"
+                            />
+                            <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                            <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                          </div>
+                        </SortableAssignmentItem>
+                      ))}
+                  </SortableContext>
+                </DndContext>
+                {/* 미배정 단어장 (드래그 불가) */}
+                {allWordlists
+                  .filter(w => !w.is_review && !w.isHidden && !w.isAssigned)
+                  .map(wordlist => (
                     <div
                       key={wordlist.id}
-                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-100/50 rounded cursor-pointer"
-                      onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded cursor-pointer ml-5"
+                      onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned, false)}
                     >
                       <Checkbox
                         checked={wordlist.isAssigned}
                         disabled={saving}
                         className="h-3.5 w-3.5"
                       />
-                      <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                      <span className="text-xs truncate flex-1 text-muted-foreground">{wordlist.name}</span>
                       <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                    </div>
+                  ))}
+              </div>
+
+              {/* 완료됨 (숨김 처리된 단어장) */}
+              {allWordlists.filter(w => !w.is_review && w.isHidden).length > 0 && (
+                <div className="border rounded p-2 max-h-[200px] overflow-y-auto border-gray-300 bg-gray-50/50">
+                  <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3" />
+                    완료됨
+                    <Badge variant="secondary" className="text-[10px] ml-auto text-gray-500">
+                      {allWordlists.filter(w => !w.is_review && w.isHidden).length}개
+                    </Badge>
+                  </div>
+                  {allWordlists.filter(w => !w.is_review && w.isHidden).map(wordlist => (
+                    <div
+                      key={wordlist.id}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-gray-100 rounded cursor-pointer"
+                      onClick={() => !saving && handleToggleWordlist(wordlist.id, true, true)}
+                    >
+                      <Checkbox
+                        checked={false}
+                        disabled={saving}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-xs truncate flex-1 text-gray-400 line-through">{wordlist.name}</span>
+                      <span className="text-[10px] text-gray-400">
+                        {wordlist.completedWords}/{wordlist.totalWords}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 복습 단어장 목록 */}
+              {allWordlists.filter(w => w.is_review && !w.isHidden).length > 0 && (
+                <div className="border rounded p-2 max-h-[200px] overflow-y-auto border-orange-200 bg-orange-50/30">
+                  <div className="text-xs font-medium text-orange-700 mb-2 flex items-center gap-1.5">
+                    <RefreshCw className="h-3 w-3" />
+                    복습 단어장
+                    <Badge variant="outline" className="text-[10px] ml-auto text-orange-600 border-orange-300">
+                      {allWordlists.filter(w => w.is_review && !w.isHidden).length}개
+                    </Badge>
+                  </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(e) => handleDragEnd(e, true)}
+                  >
+                    <SortableContext
+                      items={allWordlists
+                        .filter(w => w.is_review && !w.isHidden && w.isAssigned)
+                        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                        .map(w => w.assignment_id || w.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {/* 배정된 복습 단어장 (드래그 가능) */}
+                      {allWordlists
+                        .filter(w => w.is_review && !w.isHidden && w.isAssigned)
+                        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                        .map(wordlist => (
+                          <SortableAssignmentItem key={wordlist.assignment_id || wordlist.id} wordlist={wordlist}>
+                            <div
+                              className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-100/50 rounded cursor-pointer flex-1"
+                              onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned, false)}
+                            >
+                              <Checkbox
+                                checked={wordlist.isAssigned}
+                                disabled={saving}
+                                className="h-3.5 w-3.5"
+                              />
+                              <span className="text-xs truncate flex-1">{wordlist.name}</span>
+                              <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                            </div>
+                          </SortableAssignmentItem>
+                        ))}
+                    </SortableContext>
+                  </DndContext>
+                  {/* 미배정 복습 단어장 (드래그 불가) */}
+                  {allWordlists
+                    .filter(w => w.is_review && !w.isHidden && !w.isAssigned)
+                    .map(wordlist => (
+                      <div
+                        key={wordlist.id}
+                        className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-100/50 rounded cursor-pointer ml-5"
+                        onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned, false)}
+                      >
+                        <Checkbox
+                          checked={wordlist.isAssigned}
+                          disabled={saving}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className="text-xs truncate flex-1 text-orange-700/60">{wordlist.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{wordlist.total_words}개</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* 완료된 복습 단어장 (숨김 처리) */}
+              {allWordlists.filter(w => w.is_review && w.isHidden).length > 0 && (
+                <div className="border rounded p-2 max-h-[150px] overflow-y-auto border-gray-300 bg-gray-50/50">
+                  <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1.5">
+                    <RefreshCw className="h-3 w-3" />
+                    완료된 복습
+                    <Badge variant="secondary" className="text-[10px] ml-auto text-gray-500">
+                      {allWordlists.filter(w => w.is_review && w.isHidden).length}개
+                    </Badge>
+                  </div>
+                  {allWordlists.filter(w => w.is_review && w.isHidden).map(wordlist => (
+                    <div
+                      key={wordlist.id}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-gray-100 rounded cursor-pointer"
+                      onClick={() => !saving && handleToggleWordlist(wordlist.id, true, true)}
+                    >
+                      <Checkbox
+                        checked={false}
+                        disabled={saving}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-xs truncate flex-1 text-gray-400 line-through">{wordlist.name}</span>
+                      <span className="text-[10px] text-gray-400">
+                        {wordlist.completedWords}/{wordlist.totalWords}
+                      </span>
                     </div>
                   ))}
                 </div>

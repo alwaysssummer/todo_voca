@@ -68,6 +68,8 @@ export interface StudentWordlist {
   assigned_by: string
   assigned_at: string
   current_session: number
+  is_hidden?: boolean
+  display_order?: number
 }
 
 export interface StudentWordProgress {
@@ -191,6 +193,7 @@ export interface AssignmentData {
   filtered_word_ids: number[] | null
   base_wordlist_id: string | null  // 원본 단어장 ID (복습용)
   is_review: boolean  // 복습 단어장 여부
+  display_order?: number  // 선생님이 설정한 표시 순서
 }
 
 export interface DashboardData {

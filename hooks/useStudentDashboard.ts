@@ -37,7 +37,7 @@ export function useStudentDashboard(token: string) {
         }
 
         const [assignmentsResult, completedSessionsResult] = await Promise.all([
-          // 배정된 단어장 조회
+          // 배정된 단어장 조회 (숨김 처리된 단어장 제외)
           supabase
             .from('student_wordlists')
             .select(`
@@ -47,13 +47,15 @@ export function useStudentDashboard(token: string) {
               filtered_word_ids,
               base_wordlist_id,
               is_auto_generated,
+              display_order,
               wordlists!wordlist_id (
                 name,
                 total_words
               )
             `)
             .eq('student_id', student.id)
-            .order('assigned_at', { ascending: true })
+            .eq('is_hidden', false)
+            .order('display_order', { ascending: true })
             .returns<StudentWordlistWithWordlist[]>(),
           // 완성된 회차 목록 조회
           supabase
@@ -133,18 +135,15 @@ export function useStudentDashboard(token: string) {
               completed_words: completedCount || 0,
               filtered_word_ids: assignment.filtered_word_ids,
               base_wordlist_id: assignment.base_wordlist_id || null,
-              is_review: isReview
+              is_review: isReview,
+              display_order: (assignment as StudentWordlistWithWordlist & { display_order?: number }).display_order ?? 0
             }
           })
         )
 
-        // 원본 단어장만 먼저, 복습은 나중에 (동일 base_wordlist_id 기준)
+        // display_order 기준 정렬 (선생님이 설정한 순서 그대로)
         const sortedAssignments = [...assignments].sort((a, b) => {
-          // 복습이 아닌 것을 먼저
-          if (a.is_review !== b.is_review) {
-            return a.is_review ? 1 : -1
-          }
-          return 0
+          return (a.display_order ?? 0) - (b.display_order ?? 0)
         })
 
         // 4. 완성된 회차 데이터 변환 (이미 위에서 병렬 조회됨)

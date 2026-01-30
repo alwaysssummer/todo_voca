@@ -33,7 +33,25 @@ import {
   FileText,
   BarChart3,
   Settings,
+  GripVertical,
 } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { ExamPrintModal } from '@/components/student/exam-print-modal'
 import { VocabularyPrintModal } from '@/components/student/vocabulary-print-modal'
 
@@ -55,6 +73,48 @@ interface WordlistInfo {
   total_words: number
   isAssigned: boolean
   is_review?: boolean
+  display_order?: number
+  assignment_id?: string  // 배정된 경우 student_wordlists의 id
+  completed_words?: number  // 완료한 단어 수
+}
+
+// Sortable Table Header (학습현황/회차상세 테이블 헤더용)
+function SortableTableHeader({
+  wl,
+  children
+}: {
+  wl: { id: string; assignmentIds: string[] }
+  children: React.ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: wl.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <th ref={setNodeRef} style={style} className="px-2 py-2 text-left font-medium border-b whitespace-nowrap">
+      <div className="flex items-center gap-1">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none p-0.5 hover:bg-accent rounded"
+        >
+          <GripVertical className="w-3 h-3 text-muted-foreground" />
+        </div>
+        {children}
+      </div>
+    </th>
+  )
 }
 
 interface AssignmentWithStats {
@@ -124,6 +184,14 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
   // 단어장 관리
   const [assignments, setAssignments] = useState<TreeNode[]>([])
   const [allWordlists, setAllWordlists] = useState<WordlistInfo[]>([])
+
+  // dnd-kit 센서
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [dailyGoal, setDailyGoal] = useState<number>(20)
   const [savingGoal, setSavingGoal] = useState(false)
@@ -279,23 +347,6 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
       is_review: boolean | null
     }
 
-    const { data: originalWordlists } = await supabase
-      .from('wordlists')
-      .select('id, name, total_words, is_review')
-      .or('is_review.is.null,is_review.eq.false')
-      .order('display_order', { ascending: true })
-      .returns<WordlistRow[]>()
-
-    const { data: reviewWordlists } = await supabase
-      .from('wordlists')
-      .select('id, name, total_words, is_review')
-      .eq('is_review', true)
-      .eq('created_for_student_id', studentId)
-      .order('created_at', { ascending: false })
-      .returns<WordlistRow[]>()
-
-    const allWl = [...(originalWordlists || []), ...(reviewWordlists || [])]
-
     interface AssignmentRow {
       id: string
       wordlist_id: string
@@ -306,27 +357,154 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
       daily_goal: number | null
       current_session: number | null
       filtered_word_ids: number[] | null
+      display_order: number | null
     }
 
+    // 1. 배정 정보 먼저 조회 (display_order 기준 정렬)
     const { data: assignmentsData } = await supabase
       .from('student_wordlists')
-      .select(`id, wordlist_id, generation, is_auto_generated, base_wordlist_id, parent_assignment_id, daily_goal, current_session, filtered_word_ids`)
+      .select(`id, wordlist_id, generation, is_auto_generated, base_wordlist_id, parent_assignment_id, daily_goal, current_session, filtered_word_ids, display_order`)
       .eq('student_id', studentId)
-      .order('assigned_at', { ascending: true })
+      .order('display_order', { ascending: true })
 
     const assignmentsList = (assignmentsData as unknown as AssignmentRow[]) || []
 
-    const assignedWordlistIds = new Set(
-      assignmentsList.filter(a => a.generation === 1).map(a => a.wordlist_id)
+    // 2. 배정된 단어장 ID 추출
+    const assignedWordlistIds = assignmentsList.map(a => a.wordlist_id)
+
+    // 3. 배정된 단어장 정보 조회 (누락 없이)
+    let assignedWordlists: WordlistRow[] = []
+    if (assignedWordlistIds.length > 0) {
+      const { data } = await supabase
+        .from('wordlists')
+        .select('id, name, total_words, is_review')
+        .in('id', assignedWordlistIds)
+        .returns<WordlistRow[]>()
+      assignedWordlists = data || []
+    }
+
+    // 4. 원본 단어장 (배정용 체크박스) - 기존 로직
+    const { data: originalWordlists } = await supabase
+      .from('wordlists')
+      .select('id, name, total_words, is_review')
+      .or('is_review.is.null,is_review.eq.false')
+      .order('display_order', { ascending: true })
+      .returns<WordlistRow[]>()
+
+    // 5. 해당 학생의 복습 단어장 조회 (배정 여부 무관)
+    // 복습 단어장은 학생별로 생성되므로 created_for_student_id로 조회
+    const { data: studentReviewWordlists } = await supabase
+      .from('wordlists')
+      .select('id, name, total_words, is_review')
+      .eq('is_review', true)
+      .eq('created_for_student_id', studentId)
+      .returns<WordlistRow[]>()
+
+    // 6. 모든 단어장 병합 (중복 제거)
+    const wordlistMap = new Map<string, WordlistRow>()
+    // 먼저 배정된 단어장 추가 (복습 단어장 포함)
+    assignedWordlists.forEach(wl => wordlistMap.set(wl.id, wl))
+    // 원본 단어장 추가 (중복 시 덮어쓰지 않음)
+    originalWordlists?.forEach(wl => {
+      if (!wordlistMap.has(wl.id)) {
+        wordlistMap.set(wl.id, wl)
+      }
+    })
+    // 학생의 복습 단어장 추가 (핵심! - 배정 해제 후에도 목록에 표시)
+    studentReviewWordlists?.forEach(wl => {
+      if (!wordlistMap.has(wl.id)) {
+        wordlistMap.set(wl.id, wl)
+      }
+    })
+
+    const allWl = Array.from(wordlistMap.values())
+
+    // generation이 1인 배정만 체크박스 표시용 (배정 정보 맵 생성)
+    // filtered_word_ids도 포함하여 복습 단어장의 실제 단어 수 계산에 사용
+    const gen1AssignmentMap = new Map(
+      assignmentsList
+        .filter(a => a.generation === 1)
+        .map(a => [a.wordlist_id, {
+          assignment_id: a.id,
+          display_order: a.display_order ?? 0,
+          filtered_word_ids: a.filtered_word_ids
+        }])
     )
 
-    const wordlistInfos: WordlistInfo[] = allWl.map(wl => ({
-      id: wl.id,
-      name: wl.name,
-      total_words: wl.total_words,
-      isAssigned: assignedWordlistIds.has(wl.id),
-      is_review: wl.is_review || false
-    }))
+    // 모든 단어장의 word_id 목록을 한 번에 조회
+    interface WordRow {
+      id: number
+      wordlist_id: string
+    }
+    interface ProgressRow {
+      word_id: number
+    }
+
+    const allWordlistIds = allWl.map(wl => wl.id)
+    const { data: allWords } = await supabase
+      .from('words')
+      .select('id, wordlist_id')
+      .in('wordlist_id', allWordlistIds)
+      .returns<WordRow[]>()
+
+    // 단어장별 word_id 맵 생성
+    const wordlistWordsMap = new Map<string, number[]>()
+    allWords?.forEach(word => {
+      const existing = wordlistWordsMap.get(word.wordlist_id) || []
+      existing.push(word.id)
+      wordlistWordsMap.set(word.wordlist_id, existing)
+    })
+
+    // 모든 대상 word_id 수집 (filtered_word_ids가 있으면 사용, 없으면 전체)
+    const allTargetWordIds: number[] = []
+    allWl.forEach(wl => {
+      const assignmentInfo = gen1AssignmentMap.get(wl.id)
+      if (assignmentInfo?.filtered_word_ids && assignmentInfo.filtered_word_ids.length > 0) {
+        allTargetWordIds.push(...assignmentInfo.filtered_word_ids)
+      } else {
+        const wordIds = wordlistWordsMap.get(wl.id) || []
+        allTargetWordIds.push(...wordIds)
+      }
+    })
+
+    // 진행률 데이터 조회 (한 번에)
+    let completedWordIdsSet = new Set<number>()
+    if (allTargetWordIds.length > 0) {
+      const { data: progressData } = await supabase
+        .from('student_word_progress')
+        .select('word_id')
+        .eq('student_id', studentId)
+        .eq('status', 'completed')
+        .in('word_id', allTargetWordIds)
+        .returns<ProgressRow[]>()
+
+      progressData?.forEach(p => completedWordIdsSet.add(p.word_id))
+    }
+
+    const wordlistInfos: WordlistInfo[] = allWl.map(wl => {
+      const assignmentInfo = gen1AssignmentMap.get(wl.id)
+
+      // 진행률 계산: filtered_word_ids가 있으면 그것을 기준으로, 없으면 전체 단어 기준
+      let targetWordIds: number[]
+      if (assignmentInfo?.filtered_word_ids && assignmentInfo.filtered_word_ids.length > 0) {
+        targetWordIds = assignmentInfo.filtered_word_ids
+      } else {
+        targetWordIds = wordlistWordsMap.get(wl.id) || []
+      }
+
+      const completedWords = targetWordIds.filter(id => completedWordIdsSet.has(id)).length
+
+      return {
+        id: wl.id,
+        name: wl.name,
+        total_words: wl.total_words,
+        isAssigned: !!assignmentInfo,
+        is_review: wl.is_review || false,
+        display_order: assignmentInfo?.display_order ?? 999,
+        assignment_id: assignmentInfo?.assignment_id,
+        completed_words: completedWords
+      }
+    })
 
     setAllWordlists(wordlistInfos)
     await loadAssignmentsTree(assignmentsList, allWl)
@@ -535,6 +713,36 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
       console.error('저장 실패:', error)
     } finally {
       setSaving(false)
+    }
+  }
+
+  // 테이블 헤더 드래그앤드롭 순서 변경 핸들러
+  const handleHeaderDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id || !studentId) return
+
+    const wordlists = sessionsTable.wordlists
+    const oldIndex = wordlists.findIndex(wl => wl.id === active.id)
+    const newIndex = wordlists.findIndex(wl => wl.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = arrayMove(wordlists, oldIndex, newIndex)
+
+    // DB 업데이트: 각 단어장의 모든 assignment에 대해 display_order 업데이트
+    try {
+      for (let i = 0; i < reordered.length; i++) {
+        const wl = reordered[i]
+        for (const assignmentId of wl.assignmentIds) {
+          await (supabase as any)
+            .from('student_wordlists')
+            .update({ display_order: i })
+            .eq('id', assignmentId)
+        }
+      }
+      await loadAllData()
+    } catch (error) {
+      console.error('헤더 순서 저장 실패:', error)
+      await loadAllData()  // 실패 시 롤백
     }
   }
 
@@ -973,34 +1181,52 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
             <div className="flex-1 overflow-auto p-3">
               {activeTab === 'records' ? (
                 /* 학습현황 탭: 날짜 x 단어장 매트릭스 */
-                sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
+                sessionsTable.wordlists.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
                     <div className="text-center">
                       <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">학습 기록이 없습니다</p>
+                      <p className="text-sm">배정된 단어장이 없습니다</p>
                     </div>
                   </div>
                 ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleHeaderDragEnd}
+                  >
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50 sticky top-0">
+                      <SortableContext
+                        items={sessionsTable.wordlists.map(wl => wl.id)}
+                        strategy={horizontalListSortingStrategy}
+                      >
                       <tr>
                         <th className="px-2 py-2 text-center font-medium border-b w-10">
                           <Checkbox
                             checked={selectedSessionIds.size > 0 && selectedSessionIds.size === sessionsTable.rows.flatMap(r => r.allSessionIds).length}
                             onCheckedChange={toggleAllSelection}
                             className="h-3.5 w-3.5"
+                            disabled={sessionsTable.rows.length === 0}
                           />
                         </th>
                         <th className="px-2 py-2 text-left font-medium border-b">날짜</th>
                         {sessionsTable.wordlists.map((wl) => (
-                          <th key={wl.id} className="px-2 py-2 text-left font-medium border-b">
+                          <SortableTableHeader key={wl.id} wl={wl}>
                             {wl.name}
-                          </th>
+                          </SortableTableHeader>
                         ))}
                       </tr>
+                      </SortableContext>
                     </thead>
                     <tbody className="divide-y">
-                      {sessionsTable.rows.map((row) => {
+                      {sessionsTable.rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={2 + sessionsTable.wordlists.length} className="px-4 py-8 text-center text-muted-foreground">
+                            <Calendar className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">아직 학습 기록이 없습니다</p>
+                          </td>
+                        </tr>
+                      ) : sessionsTable.rows.map((row) => {
                         const rowSelected = row.allSessionIds.length > 0 && row.allSessionIds.every(id => selectedSessionIds.has(id))
                         const rowIndeterminate = !rowSelected && row.allSessionIds.some(id => selectedSessionIds.has(id))
 
@@ -1058,35 +1284,55 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
                       })}
                     </tbody>
                   </table>
+                  </DndContext>
                 )
               ) : (
                 /* 회차상세 탭: 날짜 x 단어장 매트릭스 (O/X + TEST 점수 상세) */
-                sessionsTable.rows.length === 0 || sessionsTable.wordlists.length === 0 ? (
+                sessionsTable.wordlists.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground">
                     <div className="text-center">
                       <FileText className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">완료된 회차가 없습니다</p>
+                      <p className="text-sm">배정된 단어장이 없습니다</p>
                     </div>
                   </div>
                 ) : (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleHeaderDragEnd}
+                  >
                   <table className="text-xs">
                     <thead className="bg-muted/50 sticky top-0">
+                      <SortableContext
+                        items={sessionsTable.wordlists.map(wl => wl.id)}
+                        strategy={horizontalListSortingStrategy}
+                      >
                       <tr>
                         <th className="px-2 py-2 text-left font-medium border-b whitespace-nowrap">날짜</th>
                         {sessionsTable.wordlists.map((wl) => (
-                          <th key={wl.id} className="px-2 py-2 text-left font-medium border-b whitespace-nowrap">
-                            <div className="truncate max-w-[160px]" title={wl.name}>
-                              {wl.name.length > 16 ? wl.name.slice(0, 16) + '...' : wl.name}
+                          <SortableTableHeader key={wl.id} wl={wl}>
+                            <div>
+                              <div className="truncate max-w-[140px]" title={wl.name}>
+                                {wl.name.length > 14 ? wl.name.slice(0, 14) + '...' : wl.name}
+                              </div>
+                              <div className="text-[9px] text-muted-foreground font-normal mt-0.5">
+                                회 / O / X / O-T / X-T
+                              </div>
                             </div>
-                            <div className="text-[9px] text-muted-foreground font-normal mt-0.5">
-                              회 / O / X / O-T / X-T
-                            </div>
-                          </th>
+                          </SortableTableHeader>
                         ))}
                       </tr>
+                      </SortableContext>
                     </thead>
                     <tbody className="divide-y">
-                      {sessionsTable.rows.map((row) => (
+                      {sessionsTable.rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={1 + sessionsTable.wordlists.length} className="px-4 py-8 text-center text-muted-foreground">
+                            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                            <p className="text-sm">아직 완료된 회차가 없습니다</p>
+                          </td>
+                        </tr>
+                      ) : sessionsTable.rows.map((row) => (
                         <tr key={row.date} className="hover:bg-muted/30">
                           <td className="px-2 py-1.5 text-muted-foreground whitespace-nowrap">
                             {row.dateLabel}
@@ -1139,6 +1385,7 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
                       ))}
                     </tbody>
                   </table>
+                  </DndContext>
                 )
               )}
             </div>
@@ -1165,39 +1412,83 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
 
               {/* 일반 단어장 */}
               <div className="space-y-0.5 mb-3">
-                {allWordlists.filter(w => !w.is_review).map(wordlist => (
-                  <div
-                    key={wordlist.id}
-                    className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded group"
-                  >
-                    <Checkbox
-                      checked={wordlist.isAssigned}
-                      disabled={saving}
-                      className="h-3 w-3 cursor-pointer"
-                      onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
-                    />
-                    <span
-                      className="text-[11px] truncate flex-1 cursor-pointer"
-                      onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                {/* 배정된 단어장 */}
+                {allWordlists
+                  .filter(w => !w.is_review && w.isAssigned)
+                  .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                  .map(wordlist => (
+                    <div
+                      key={wordlist.id}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded group"
                     >
-                      {wordlist.name}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground">{wordlist.total_words}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteWordlist(wordlist.id, wordlist.name)
-                      }}
-                      disabled={deleting}
-                      title="단어장 삭제"
+                      <Checkbox
+                        checked={wordlist.isAssigned}
+                        disabled={saving}
+                        className="h-3 w-3 cursor-pointer"
+                        onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                      />
+                      <span
+                        className="text-[11px] truncate flex-1 cursor-pointer"
+                        onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                      >
+                        {wordlist.name}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">
+                        {wordlist.completed_words ?? 0}/{wordlist.total_words}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteWordlist(wordlist.id, wordlist.name)
+                        }}
+                        disabled={deleting}
+                        title="단어장 삭제"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                {/* 미배정 단어장 */}
+                {allWordlists
+                  .filter(w => !w.is_review && !w.isAssigned)
+                  .map(wordlist => (
+                    <div
+                      key={wordlist.id}
+                      className="flex items-center gap-1.5 py-1 px-1 hover:bg-muted/50 rounded group"
                     >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
+                      <Checkbox
+                        checked={wordlist.isAssigned}
+                        disabled={saving}
+                        className="h-3 w-3 cursor-pointer"
+                        onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                      />
+                      <span
+                        className="text-[11px] truncate flex-1 cursor-pointer text-muted-foreground"
+                        onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                      >
+                        {wordlist.name}
+                      </span>
+                      <span className="text-[9px] text-muted-foreground">
+                        {wordlist.completed_words ?? 0}/{wordlist.total_words}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteWordlist(wordlist.id, wordlist.name)
+                        }}
+                        disabled={deleting}
+                        title="단어장 삭제"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
               </div>
 
               {/* 복습 단어장 */}
@@ -1208,39 +1499,83 @@ export function StudentDetailPanel({ studentId, onRefresh }: StudentDetailPanelP
                     <span className="text-[10px] font-medium text-orange-600">복습</span>
                   </div>
                   <div className="space-y-0.5">
-                    {allWordlists.filter(w => w.is_review).map(wordlist => (
-                      <div
-                        key={wordlist.id}
-                        className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-50 rounded group"
-                      >
-                        <Checkbox
-                          checked={wordlist.isAssigned}
-                          disabled={saving}
-                          className="h-3 w-3 cursor-pointer"
-                          onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
-                        />
-                        <span
-                          className="text-[11px] truncate flex-1 text-orange-700 cursor-pointer"
-                          onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                    {/* 배정된 복습 단어장 */}
+                    {allWordlists
+                      .filter(w => w.is_review && w.isAssigned)
+                      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                      .map(wordlist => (
+                        <div
+                          key={wordlist.id}
+                          className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-50 rounded group"
                         >
-                          {wordlist.name}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground">{wordlist.total_words}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteWordlist(wordlist.id, wordlist.name)
-                          }}
-                          disabled={deleting}
-                          title="단어장 삭제"
+                          <Checkbox
+                            checked={wordlist.isAssigned}
+                            disabled={saving}
+                            className="h-3 w-3 cursor-pointer"
+                            onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          />
+                          <span
+                            className="text-[11px] truncate flex-1 text-orange-700 cursor-pointer"
+                            onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          >
+                            {wordlist.name}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">
+                            {wordlist.completed_words ?? 0}/{wordlist.total_words}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteWordlist(wordlist.id, wordlist.name)
+                            }}
+                            disabled={deleting}
+                            title="단어장 삭제"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    {/* 미배정 복습 단어장 */}
+                    {allWordlists
+                      .filter(w => w.is_review && !w.isAssigned)
+                      .map(wordlist => (
+                        <div
+                          key={wordlist.id}
+                          className="flex items-center gap-1.5 py-1 px-1 hover:bg-orange-50 rounded group"
                         >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
+                          <Checkbox
+                            checked={wordlist.isAssigned}
+                            disabled={saving}
+                            className="h-3 w-3 cursor-pointer"
+                            onCheckedChange={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          />
+                          <span
+                            className="text-[11px] truncate flex-1 text-orange-700/60 cursor-pointer"
+                            onClick={() => !saving && handleToggleWordlist(wordlist.id, wordlist.isAssigned)}
+                          >
+                            {wordlist.name}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">
+                            {wordlist.completed_words ?? 0}/{wordlist.total_words}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 text-red-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteWordlist(wordlist.id, wordlist.name)
+                            }}
+                            disabled={deleting}
+                            title="단어장 삭제"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
                   </div>
                 </>
               )}
